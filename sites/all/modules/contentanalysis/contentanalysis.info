@@ -1,0 +1,19 @@
+name = "Content Analysis API"
+description = "Provides an API for content analyzers"
+package = Content analysis
+core = 7.x
+
+dependencies[] = ctools
+files[] = contentanalysis.admin.inc
+files[] = contentanalysis.install
+files[] = contentanalysis.module
+files[] = contentanalysis.css
+
+configure = admin/settings/contentanalysis
+
+; Information added by Drupal.org packaging script on 2016-12-12
+version = "7.x-1.0-beta7+12-dev"
+core = "7.x"
+project = "contentanalysis"
+datestamp = "1481580485"
+

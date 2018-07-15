@@ -1,0 +1,185 @@
+<?php
+
+/**
+ * @file
+ * Provides the UI for viewing outputs.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function erpal_output_ui_menu() {
+  $output_paths = array(
+    'output_add' => 'admin/erpal/add-content/output/add',
+    'output_add_user' => 'output/add',
+  );
+  foreach ($output_paths as $key => $path) {
+    $items[$path] = array(
+      'title' => 'Add an output',
+      'page callback' => 'erpal_output_ui_add_output',
+      'access callback' => 'entity_access',
+      'access arguments' => array('create_view', 'erpal_output'),
+      'type' => MENU_NORMAL_ITEM,
+      'file' => 'erpal_output_ui.pages.inc',
+      'weight' => 5,
+    );
+
+    foreach (erpal_output_types() as $type => $info) {
+      $arg = 5;
+      if ($key == 'output_add_user') {
+        $arg = 2;
+      }
+      $items[$path . '/' . $type] = array(
+        'title' => 'Add output @type',
+        'title arguments' => array('@type' => $info->label),
+        'description' => $info->description,
+        'page callback' => 'erpal_output_entity_ui_get_form_wrapper',
+        'page arguments' => array($arg),
+        'access callback' => 'entity_access',
+        'access arguments' => array('create', 'erpal_output', $type),
+        'type' => MENU_NORMAL_ITEM,
+        'file' => 'erpal_output_ui.pages.inc',
+      );
+    }
+  }
+
+  $items['erpal/output/%erpal_output'] = array(
+    'title' => 'output',
+    'page callback' => 'erpal_output_view',
+    'page arguments' => array(2),
+    'title callback' => 'entity_label',
+    'title arguments' => array('erpal_output', 2),
+    'access callback' => 'entity_access',
+    'access arguments' => array('view', 'erpal_output', 2),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['erpal/output/%erpal_output/view'] = array(
+    'title' => 'View',
+    'weight' => -10,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+  );
+
+  $items['erpal/output/%erpal_output/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'entity_ui_get_form',
+    'page arguments' => array('erpal_output', 2, 'edit'),
+    'access callback' => 'entity_access',
+    'access arguments' => array('edit', 'erpal_output', 2),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'erpal_output_ui.pages.inc',
+  );
+  $items['erpal/output/%erpal_output/delete'] = array(
+    'title' => 'Delete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('erpal_output_form_delete_confirm', 2),
+    'access callback' => 'entity_access',
+    'access arguments' => array('edit', 'erpal_output', 2),
+    'weight' => 1,
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'erpal_output_ui.pages.inc',
+  );
+  $items[ERPAL_OUTPUT_ADMIN_PATH . '/list'] = array(
+    'title' => 'List',
+    'weight' => -10,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_admin_menu_map().
+ */
+function erpal_output_ui_admin_menu_map() {
+  $map = $arguments = array();
+  $erpal_output_types = array_keys(erpal_output_types());
+  foreach ($erpal_output_types as $type) {
+    $arguments[] = array(
+      '%erpal_output_type' => array($type),
+      '%entity_object' => array($type),
+    );
+  }
+  if ($arguments) {
+    $map[ERPAL_OUTPUT_ADMIN_PATH . '/manage/%erpal_output_type'] = array(
+      // Link generated items directly to the "output Types" item.
+      'parent' => ERPAL_OUTPUT_ADMIN_PATH,
+      // Hide the "List" item, as this expansion will expose all available
+      // options.
+      'hide' => ERPAL_OUTPUT_ADMIN_PATH . '/list',
+      // Create expansion arguments for the '%erpal_output_type' placeholder.
+      'arguments' => $arguments,
+    );
+  }
+
+  return $map;
+}
+
+/**
+ * Implements hook_menu_local_tasks_alter().
+ */
+function erpal_output_ui_menu_local_tasks_alter(&$data, $router_item, $root_path) {
+
+  $local_tasks = array();
+
+  if ($root_path == 'erpal/budget/%') {
+    $budget = erpal_budget_load(arg(2));
+    $resource = field_get_items('erpal_budget', $budget, 'field_resource');
+    $local_tasks[] = array(
+      'root_path' => $root_path,
+      'menu_item' => 'output/add',
+      'title'     => 'Create output',
+      'query'     => array('field_output_budget' => $budget->budget_id, 'field_resource' => $resource[0]['target_id']),
+    );
+  }
+  if ($root_path == 'erpal/resource/%') {
+    $local_tasks[] = array(
+      'root_path' => $root_path,
+      'menu_item' => 'output/add',
+      'title'     => 'Create output',
+      'query'     => array('field_resource' => arg(2)),
+    );
+  }
+
+  erpal_core_add_local_actions($data, $local_tasks, $root_path);
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function erpal_output_ui_form_alter(&$form, &$form_state, $form_id) {
+  // Alter the operations links so they looks like CTools dropbutton.
+  if ($form_id == 'erpal_output_type_overview_form') {
+    $ops_count = $form['table']['#header'][2]['colspan'];
+    $form['table']['#header'][2] = t('Operations');
+
+    erpal_core_ui_ctools_add_dropbutton_files();
+    foreach ($form['table']['#rows'] as $key => $row) {
+      $output = theme('erpal_core_ui_ctools_dropbutton', array(
+        'ops_count' => $ops_count,
+        'links' => $row,
+        'index' => $key,
+      ));
+
+      $form['table']['#rows'][$key] = array_merge(array_slice($row, 0, count($row) - $ops_count), array($output));
+    }
+  }
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function erpal_output_ui_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'erpal_output_ui') . '/views',
+  );
+}
+
+
+/**
+ * Output UI view callback.
+ */
+function erpal_output_ui_view($output) {
+  return erpal_output_view($output);
+}

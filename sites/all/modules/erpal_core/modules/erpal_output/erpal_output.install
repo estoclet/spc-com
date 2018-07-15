@@ -1,0 +1,258 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall functions for the ERPAL Output module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function erpal_output_install() {
+  $t = get_t();
+  module_load_include('inc', 'erpal_budget', 'includes/erpal_budget.units');
+  _erpal_budget_units_import();
+
+  $units_info = units_measure_load_multiple(FALSE);
+  foreach ($units_info as $measure) {
+    // Create a default output type.
+    $output = entity_create('erpal_output_type', array(
+      'type' => $measure->measure,
+      'label' => $measure->label,
+      'description' => $t('Default !name output.', array('!name' => $measure->label)),
+    ));
+    variable_set('output_' . $measure->measure, $measure->measure);
+    erpal_output_type_save($output);
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function erpal_output_uninstall() {
+  $additional_params = array('include_inactive' => TRUE);
+  $instances = field_read_instances(array('entity_type' => 'erpal_output'), $additional_params);
+  foreach ($instances as $instance) {
+    field_delete_instance($instance);
+  }
+
+  // Remove variables.
+  module_load_include('inc', 'erpal_budget', 'includes/erpal_budget.units');
+  $units_info = _erpal_budget_units_default();
+  foreach ($units_info as $measure => $measure_info) {
+    variable_del('output_' . $measure);
+  }
+}
+
+/**
+ * Implements hook_enable().
+ */
+function erpal_output_enable() {
+  // Clear the cache to display in Feeds as available plugin.
+  cache_clear_all('plugins:feeds:plugins', 'cache');
+  // Clear menu cache to displat entity links.
+  cache_clear_all(NULL, 'cache_menu');
+}
+
+/**
+ * Implements hook_schema().
+ */
+function erpal_output_schema() {
+  $schema = array();
+
+  $schema['erpal_output'] = array(
+    'description' => 'The base table for outputs.',
+    'fields' => array(
+      'output_id' => array(
+        'description' => 'The primary identifier for an output.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'revision_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => NULL,
+        'description' => 'Primary identifier of this {erpal_output_revision}.',
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that owns this output; initially, this is the user that created it.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'type' => array(
+        'description' => 'The type (bundle) of this output.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'title' => array(
+        'description' => 'The title of the output.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the output was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the output was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'indexes' => array(
+      'created' => array('created'),
+      'changed' => array('changed'),
+    ),
+    'foreign keys' => array(
+      'output_type' => array(
+        'table' => 'erpal_output_type',
+        'columns' => array('type' => 'type'),
+      ),
+      'output_revision' => array(
+        'table' => 'erpal_output_revision',
+        'columns' => array('revision_id' => 'revision_id'),
+      ),
+    ),
+    'primary key' => array('output_id'),
+  );
+
+  $schema['erpal_output_revision'] = array(
+    'description' => 'Stores information about each saved revision of a {erpal_output}',
+    'fields' => array(
+      'revision_id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary identifier of this {erpal_output_revision}.',
+      ),
+      'output_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => NULL,
+        'description' => 'The {erpal_output}.output_id for this revision.',
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that created this version.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'description' => 'The title of the output.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the output was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the output was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'foreign keys' => array(
+      'versioned_output' => array(
+        'table' => 'erpal_output',
+        'columns' => array('output_id' => 'output_id'),
+      ),
+      'version_creator' => array(
+        'table' => 'user',
+        'columns' => array('uid' => 'uid'),
+      ),
+    ),
+    'primary key' => array('revision_id'),
+  );
+
+  $schema['erpal_output_type'] = array(
+    'description' => 'Stores information about all defined output types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique output type ID.',
+      ),
+      'type' => array(
+        'description' => 'The machine-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'description' => array(
+        'description' => 'A brief description of this type.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium',
+        'translatable' => TRUE,
+      ),
+    ) + entity_exportable_schema_fields(),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'type' => array('type'),
+    ),
+  );
+
+  if (module_exists('uuid')) {
+    $field = uuid_schema_field_definition();
+    $schema['erpal_output']['fields']['uuid'] = $field;
+    $schema['erpal_output']['indexes']['uuid'] = array('uuid');
+    $schema['erpal_output_revision']['fields']['vuuid'] = $field;
+    $schema['erpal_output_revision']['indexes']['vuuid'] = array('vuuid');
+  }
+
+  return $schema;
+}
+
+/**
+ * Implements hook_field_schema().
+ */
+function erpal_output_field_schema($field) {
+  return array(
+    'columns' => array(
+      'target_id' => array(
+        'description' => 'The id of the target entity.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'value' => array(
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+    ),
+    'indexes' => array(
+      'target_id' => array(
+        'target_id',
+      ),
+    ),
+    'foreign keys' => array(
+      'erpal_budget' => array(
+        'table' => 'erpal_budget',
+        'columns' => array(
+          'target_id' => 'budget_id',
+        ),
+      ),
+    ),
+  );
+}

@@ -1,0 +1,16 @@
+name = "Content Optimizer"
+description = "Profides search engine optimization analysis of node and other content."
+package = Content analysis
+dependencies[] = contentanalysis
+files[] = contentoptimizer.install
+files[] = contentoptimizer.module
+files[] = contentoptimizer.css
+scripts[] = contentoptimizer.js
+configure = admin/config/content/contentanalysis/analyzers
+core = 7.x
+; Information added by drupal.org packaging script on 2013-09-30
+version = "7.x-2.0-beta4+0-dev"
+core = "7.x"
+project = "contentoptimizer"
+datestamp = "1380566954"
+

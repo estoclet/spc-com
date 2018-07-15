@@ -1,0 +1,116 @@
+<?php
+
+/**
+ * Implements hook_ckeditor_plugin().
+ */
+function ckeditor_bootstrap_bundle_ckeditor_plugin() {
+    $module_path = drupal_get_path('modules', 'ckeditor_bootstrap_bundle');
+    $plugins     = array();
+
+    $plugins['bootstrapBreadcrumbs'] = array(
+        'name'    => 'bootstrapBreadcrumbs',
+        'desc'    => t('BootstrapBreadcrumbs: CKEditor: breadcrumbs plugin'),
+        'path'    => $module_path . '/plugins/bootstrapBreadcrumbs/',
+        'default' => 't',
+        'buttons' => array(
+            'leaflet' => array(
+                'label' => 'Bootstrap Breadcrumbs',
+                'icon'  => 'icons/bootstrapBreadcrumbs.png',
+            ),
+        ),
+    );
+
+    $plugins['bootstrapButtons'] = array(
+        'name'    => 'bootstrapButtons',
+        'desc'    => t('bootstrapButtons: CKEditor: buttons plugin'),
+        'path'    => $module_path . '/plugins/bootstrapButtons/',
+        'default' => 't',
+        'buttons' => array(
+            'leaflet' => array(
+                'label' => 'Bootstrap buttons',
+                'icon'  => 'icons/bootstrapButtons.png',
+            ),
+        ),
+    );
+
+    $plugins['bootstrapCarousel'] = array(
+        'name'    => 'bootstrapCarousel',
+        'desc'    => t('bootstrapCarousel: CKEditor: buttons plugin'),
+        'path'    => $module_path . '/plugins/bootstrapCarousel/',
+        'default' => 't',
+        'buttons' => array(
+            'leaflet' => array(
+                'label' => 'Bootstrap Carousel',
+                'icon'  => 'icons/bootstrapCarousel.png',
+            ),
+        ),
+    );
+
+    $plugins['bootstrapCollapse'] = array(
+        'name'    => 'bootstrapCollapse',
+        'desc'    => t('bootstrapCollapse: CKEditor: collapse plugin'),
+        'path'    => $module_path . '/plugins/bootstrapCollapse/',
+        'default' => 't',
+        'buttons' => array(
+            'leaflet' => array(
+                'label' => 'Bootstrap collapse',
+                'icon'  => 'icons/bootstrapCollapse.png',
+            ),
+        ),
+    );
+
+    $plugins['bootstrapListGroup'] = array(
+        'name'    => 'bootstrapListGroup',
+        'desc'    => t('bootstrapListGroup: CKEditor: list plugin'),
+        'path'    => $module_path . '/plugins/bootstrapListGroup/',
+        'default' => 't',
+        'buttons' => array(
+            'leaflet' => array(
+                'label' => 'Bootstrap list',
+                'icon'  => 'icons/bootstrapListGroup.png',
+            ),
+        ),
+    );
+
+    $plugins['bootstrapPanel'] = array(
+        'name'    => 'bootstrapPanel',
+        'desc'    => t('bootstrapPanel: CKEditor: panel plugin'),
+        'path'    => $module_path . '/plugins/bootstrapPanel/',
+        'default' => 't',
+        'buttons' => array(
+            'leaflet' => array(
+                'label' => 'Bootstrap panel',
+                'icon'  => 'icons/bootstrapPanel.png',
+            ),
+        ),
+    );
+
+    $plugins['bootstrapTab'] = array(
+        'name'    => 'bootstrapTab',
+        'desc'    => t('bootstrapTab: CKEditor: tab plugin'),
+        'path'    => $module_path . '/plugins/bootstrapTab/',
+        'default' => 't',
+        'buttons' => array(
+            'leaflet' => array(
+                'label' => 'Bootstrap tabs',
+                'icon'  => 'icons/bootstrapTab.png',
+            ),
+        ),
+    );
+
+    $plugins['lineutils'] = array(
+        'name'    => 'lineutils',
+        'desc'    => t('CKEditor: LineUtils plugin'),
+        'path'    => $module_path . '/plugins/lineutils/',
+        'default' => 't'
+    );
+
+    $plugins['widget'] = array(
+        'name'    => 'widget',
+        'desc'    => t('CKEditor: Widget plugin'),
+        'path'    => $module_path . '/plugins/widget/',
+        'default' => 't'
+    );
+
+    return $plugins;
+}

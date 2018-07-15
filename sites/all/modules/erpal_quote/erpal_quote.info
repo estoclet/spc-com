@@ -1,0 +1,19 @@
+name = ERPAL Quote
+description = ERPAL Quote Module. Provide functionality for creating/managing quotes!
+core = 7.x
+package = ERPAL Quote
+
+dependencies[] = commerce_order_types
+dependencies[] = commerce_order
+dependencies[] = commerce_line_item
+dependencies[] = commerce_product_reference
+dependencies[] = custom_order_number
+dependencies[] = erpal_core
+dependencies[] = date_item
+
+; Information added by Drupal.org packaging script on 2016-02-03
+version = "7.x-3.0-alpha1+20-dev"
+core = "7.x"
+project = "erpal_quote"
+datestamp = "1454513652"
+

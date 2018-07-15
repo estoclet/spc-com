@@ -1,0 +1,99 @@
+h1, h2, h3, h4, h5, h6 {
+    color: @heading_color;
+    font-family: 'Helvetica Neue',Helvetica,sans-serif;
+    font-weight: 600;
+    margin-bottom: 15px;
+    text-rendering: optimizelegibility;
+}
+p {
+  line-height:25px;
+}
+*, *:after, *:before {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+ol, ol.no-bullet, ul, ul.no-bullet {
+    margin-left: 0;
+}
+a:hover {
+  text-decoration:none;
+}
+.form-text, .form-textarea {
+  &:focus {
+    border: solid 1px @base_color !important;
+  }
+}
+.pagination > li > a, .pagination > li > span {
+    background-color: #272727;
+    color: #FFFFFF;
+    float: left;
+    line-height: 1.82857;
+    margin-left: 5px;
+    padding: 6px 15px;
+    position: relative;
+    text-decoration: none;
+    border: 0 none;
+}
+.pagination > li > a:hover {
+    background-color: @base_color;
+    color: #FFF;
+}
+.pagination > li:first-child > a, .pagination > li:last-child > a, .pagination > li:first-child > span, .pagination > li:last-child > span {
+    border-radius: 0px;
+    border-radius: 0px;
+}
+.pagination .pager-current a {  
+    background-color: @base_color;
+}
+
+img {
+    height: auto;
+    max-width: 100%;
+}
+	.popular_items img,
+	.comment img,
+	.shopping-cart-widget img,
+	div.thumbnails a img,
+	.authorbox_wrapper img,
+	.flickr-gallery li img,
+	.recent_posts img,
+	.recent_posts_widget img,
+	.testimonial_wrap img, .popular-post img {		
+		-webkit-transition: opacity 0.2s ease-in-out;
+		-moz-transition: opacity 0.2s ease-in-out;
+		-ms-transition: opacity 0.2s ease-in-out;
+		-o-transition: opacity 0.2s ease-in-out;
+		transition: opacity 0.2s ease-in-out;
+}
+.popular_items img:hover,
+	.shopping-cart-widget img:hover,
+	div.thumbnails a img:hover,
+	.comment img:hover,
+	.authorbox_wrapper img:hover,
+	.flickr-gallery li img:hover,
+	.recent_posts img:hover,
+	.recent_posts_widget img:hover,
+	.testimonial_wrap img:hover, .popular-post img:hover {
+		-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=60)";
+		filter: alpha(opacity=60);
+		-moz-opacity: 0.6;
+		-khtml-opacity: 0.6;
+		opacity: 0.6;
+}
+
+.greybg{
+    background-color: #F6F6F6;
+}
+.bordertop {
+  border-top: 1px solid #E6E9EA;
+}
+.paddingtop {
+  padding:60px 0 0;
+}
+.margintop {
+  margin:60px 0 0;
+}
+.padding-copyright {
+  padding: 25px 0 20px 0;
+}

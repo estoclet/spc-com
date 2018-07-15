@@ -1,0 +1,219 @@
+<?php
+
+/**
+ * @file
+ * Main functionality of Custom Order Number.
+ */
+
+// One single order number, never regenerated.
+define('CUSTOM_ORDER_NUMBER_METHOD_INFINITE', 'infinite');
+// Order number is regenerated every year.
+define('CUSTOM_ORDER_NUMBER_METHOD_YEARLY', 'yearly');
+// Order number is regenerated every month.
+define('CUSTOM_ORDER_NUMBER_METHOD_MONTHLY', 'monthly');
+
+/**
+ * Implements hook_menu().
+ */
+function custom_order_number_menu() {
+  $items['admin/commerce/config/custom-order-number'] = array(
+    'title' => 'Custom order number',
+    'description' => 'Configure the custom order number settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('custom_order_number_admin_form', 'commerce_order'),
+    'access arguments' => array('configure order settings'),
+    'file' => 'custom_order_number.admin.inc',
+  );
+  $items['admin/commerce/config/custom-order-number/commerce_order'] = array(
+    'title' => 'Commerce order',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+  if (function_exists('commerce_order_types_order_types')) {
+    foreach (commerce_order_types_order_types() as $type => $info) {
+      if ($type == 'commerce_order') {
+        continue;
+      }
+      $items['admin/commerce/config/custom-order-number/' . $type] = $items['admin/commerce/config/custom-order-number'];
+      $items['admin/commerce/config/custom-order-number/' . $type]['title'] = $info->name;
+      $items['admin/commerce/config/custom-order-number/' . $type]['page arguments'] = array(
+        'custom_order_number_admin_form',
+        $type,
+      );
+      $items['admin/commerce/config/custom-order-number/' . $type]['type'] = MENU_LOCAL_TASK;
+    }
+  }
+
+  return $items;
+}
+
+/**
+ * Sets order number on order.
+ *
+ * Used as Rules action callback.
+ *
+ * @see custom_order_number_rules_action_info()
+ */
+function custom_order_number_nr($order) {
+  
+  if (!variable_get('custom_order_number_' . $order->type . '_nr_enable', TRUE)) {
+    return;
+  }
+  // Lock down this function so that other requests do not interfere.
+  $lock_name = 'custom_order_number_nr';
+  while (!lock_acquire($lock_name)) {
+    lock_wait($lock_name);
+  }
+
+  $method = variable_get('custom_order_number_' . $order->type . '_nr_method', CUSTOM_ORDER_NUMBER_METHOD_YEARLY);
+  switch ($method) {
+    case CUSTOM_ORDER_NUMBER_METHOD_MONTHLY:
+      $order_number = custom_order_number_nr_monthly($order->type);
+      break;
+
+    case CUSTOM_ORDER_NUMBER_METHOD_YEARLY:
+      $order_number = custom_order_number_nr_yearly($order->type);
+      break;
+
+    case CUSTOM_ORDER_NUMBER_METHOD_INFINITE:
+      $order_number = custom_order_number_nr_infinite($order->type);
+      break;
+  }
+
+  // Check if we have a unique order number. If not, write a watchdog error and
+  // do not change the order number.
+  if (!custom_order_number_validate_number_unique($order_number, $order->order_id, $order->type)) {
+    watchdog('commerce_billy', t('Error: Order number %number for order %id already exists.', array('%number' => $order_number, '%id' => $order->order_id)), WATCHDOG_ERROR);
+  }
+  else {
+    $order->order_number = $order_number;
+    commerce_order_save($order);
+  }
+  lock_release($lock_name);
+}
+
+/**
+ * Generated monthly order number.
+ */
+function custom_order_number_nr_monthly($type) {
+  $last_number = custom_order_number_query_variable('custom_order_number_' . $type . '_nr_last');
+  $current_year = date('Y');
+  $current_month = date('m');
+
+  $id = 1;
+  if ($last_number) {
+    if ($last_number['year'] == $current_year && $last_number['month'] == $current_month) {
+      $id = $last_number['id'] + 1;
+    }
+  }
+
+  $new_nr_array = array(
+    'month' => $current_month,
+    'year' => $current_year,
+    'id' => $id,
+  );
+  variable_set('custom_order_number_' . $type . '_nr_last', $new_nr_array);
+
+  return custom_order_number_apply_order_nr_pattern($new_nr_array, $type);
+}
+
+/**
+ * Generated yearly order number.
+ */
+function custom_order_number_nr_yearly($type) {
+  $last_number = custom_order_number_query_variable('custom_order_number_' . $type . '_nr_last');
+  $current_year = date('Y');
+
+  $id = 1;
+  if ($last_number) {
+    if ($last_number['year'] == $current_year) {
+      $id = $last_number['id'] + 1;
+    }
+  }
+
+  $new_nr_array = array(
+    'year' => $current_year,
+    'id' => $id,
+  );
+  variable_set('custom_order_number_' . $type . '_nr_last', $new_nr_array);
+
+  return custom_order_number_apply_order_nr_pattern($new_nr_array, $type);
+}
+
+/**
+ * Generated infinite order number.
+ */
+function custom_order_number_nr_infinite($type) {
+  $last_number = custom_order_number_query_variable('custom_order_number_' . $type . '_nr_last');
+
+  $id = 1;
+  if ($last_number) {
+    $id = $last_number['id'] + 1;
+  }
+
+  $new_nr_array = array(
+    'id' => $id,
+  );
+  variable_set('custom_order_number_' . $type . '_nr_last', $new_nr_array);
+  return custom_order_number_apply_order_nr_pattern($new_nr_array, $type);
+}
+
+/**
+ * Helper function that applies the order number pattern by replacing tokens
+ * and the {id} placeholder.
+ */
+function custom_order_number_apply_order_nr_pattern($nr_array, $type) {
+  $pattern = variable_get('custom_order_number_' . $type . '_nr_pattern', '[date:custom:Y]-{id}');
+  $new_nr = str_replace('{id}', $nr_array['id'], $pattern);
+  $new_nr = token_replace($new_nr, array(), array('clear' => TRUE));
+
+  return $new_nr;
+}
+
+/**
+ * Helper function that directly queries variable values from the database.
+ *
+ * In certain situations variable_get() cannot be used, as it statically caches
+ * the value. e.g. we always need to most recent invoice number.
+ *
+ * @param string $var_name
+ *   The name of the variable.
+ */
+function custom_order_number_query_variable($var_name) {
+  return unserialize(db_select('variable', 'v')
+    ->fields('v')
+    ->condition('name', $var_name)
+    ->execute()
+    ->fetchField(1));
+}
+
+/**
+ * Checks to see if a given order number already exists for another order.
+ *
+ * @param $order_number
+ *   The string to match against existing order numbers.
+ * @param $order_id
+ *   The ID of the order the number is for; an empty value represents the number
+ *     is meant for a new order.
+ * @param $type
+ *   The name of order bundle.
+ *
+ * @return
+ *   TRUE or FALSE indicating whether or not the number exists for another
+ *     order.
+ */
+function custom_order_number_validate_number_unique($order_number, $order_id, $type) {
+  // Look for an ID of an order matching the supplied number.
+  if ($match_id = db_query('SELECT order_id FROM {commerce_order} WHERE order_number = :order_number AND type = :type', array(
+    ':order_number' => $order_number,
+    ':type' => $type,
+    ))->fetchField()) {
+    // If this number is supposed to be for a new order or an order other than
+    // the one that matched...
+    if (empty($order_id) || $match_id != $order_id) {
+      return FALSE;
+    }
+  }
+
+  return TRUE;
+}

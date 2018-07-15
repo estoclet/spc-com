@@ -1,0 +1,26 @@
+<?php
+/**
+ * @file
+ * Uninstalls Maintenance Countdown
+ */
+/**
+ * Implements of hook_uninstall().
+ */
+function mcd_uninstall() {
+  variable_del('mcd_days');
+  variable_del('mcd_hours');
+  variable_del('mcd_maintenance');
+  variable_del('mcd_minutes');
+  variable_del('mcd_months');
+  variable_del('mcd_page_themes');
+  variable_del('mcd_reload_button');
+  variable_del('mcd_seconds');
+  variable_del('mcd_stoptime');
+  variable_del('mcd_time_up_message');
+  variable_del('mcd_site_logo');
+  variable_del('mcd_site_name');
+  variable_del('mcd_site_slogan');
+  variable_del('mcd_page_title');
+  variable_del('mcd_email_subscr');
+  variable_del('mcd_email_place');
+}

@@ -1,0 +1,27 @@
+name = ERPAL Resource UI
+description = User Interface for resource entities.
+package = ERPAL Core
+core = 7.x
+configure = admin/structure/erpal/resource-types
+
+; =======================
+; Dependencies
+; =======================
+
+dependencies[] = erpal_resource
+dependencies[] = erpal_core_ui
+dependencies[] = views_bulk_operations
+dependencies[] = page_manager
+dependencies[] = panels
+dependencies[] = panels_tabs
+dependencies[] = field_extrawidgets
+dependencies[] = entityreference_prepopulate
+dependencies[] = views_content
+
+
+; Information added by Drupal.org packaging script on 2016-09-29
+version = "7.x-3.0-alpha1+42-dev"
+core = "7.x"
+project = "erpal_core"
+datestamp = "1475156341"
+

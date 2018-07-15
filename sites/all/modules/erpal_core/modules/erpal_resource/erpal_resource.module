@@ -1,0 +1,685 @@
+<?php
+
+/**
+ * @file
+ * Provides an entity for recording work results.
+ */
+
+define('ERPAL_RESOURCE_DELIMITER', '___');
+
+/**
+ * Include file with hook_property_info().
+ */
+module_load_include('inc', 'erpal_resource', 'erpal_resource.info');
+
+/**
+ * Implements hook_entity_info().
+ */
+function erpal_resource_entity_info() {
+  $return = array(
+    'erpal_resource' => array(
+      'label' => t('ERPAL Resource'),
+      'entity class' => 'ERPALResourceEntity',
+      'inline entity form' => array('controller' => 'ERPALResourceInlineEntityFormController'),
+      'controller class' => 'ERPALResourceController',
+      'base table' => 'erpal_resource',
+      'revision table' => 'erpal_resource_revision',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'resource_id',
+        'bundle' => 'type',
+        'label' => 'title',
+        'revision' => 'revision_id',
+      ),
+      'bundle keys' => array(
+        'bundle' => 'type',
+      ),
+      'bundles' => array(),
+      'load hook' => 'erpal_resource_load',
+      'view modes' => array(
+        'full' => array(
+          'label' => t('Full content'),
+          'custom settings' => FALSE,
+        ),
+      ),
+      'label callback' => 'entity_class_label',
+      'uri callback' => 'entity_class_uri',
+      'access callback' => 'erpal_resource_access',
+      'module' => 'erpal_resource',
+      'permission labels' => array(
+        'singular' => t('resource'),
+        'plural' => t('resource'),
+      ),
+    ),
+  );
+  $return['erpal_resource_type'] = array(
+    'label' => t('ERPAL Resource Type'),
+    'entity class' => 'ERPALResourceType',
+    'controller class' => 'ERPALResourceTypeController',
+    'base table' => 'erpal_resource_type',
+    'fieldable' => FALSE,
+    'bundle of' => 'erpal_resource',
+    'exportable' => TRUE,
+    'entity keys' => array(
+      'id' => 'id',
+      'name' => 'type',
+      'label' => 'label',
+    ),
+    'module' => 'erpal_resource',
+    // Enable the entity API's admin UI.
+    'admin ui' => array(
+      'path' => 'admin/erpal/resource-types',
+      'file' => 'erpal_resource.admin.inc',
+      'controller class' => 'EntityDefaultUIController',
+    ),
+    'access callback' => 'erpal_resource_type_access',
+  );
+
+  if (module_exists('uuid')) {
+    $return['erpal_resource']['uuid'] = TRUE;
+    $return['erpal_resource']['entity keys']['uuid'] = 'uuid';
+    $return['erpal_resource']['entity keys']['revision uuid'] = 'vuuid';
+  }
+
+  return $return;
+}
+
+/**
+ * Implements hook_entity_info_alter().
+ *
+ * Use this hook to specify resource bundles to avoid a recursion, as loading
+ * the resource types needs the entity info too.
+ */
+function erpal_resource_entity_info_alter(&$entity_info) {
+  foreach (erpal_resource_types() as $type => $info) {
+    $entity_info['erpal_resource']['bundles'][$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/erpal/resource-types/manage/%erpal_resource_type',
+        'real path' => 'admin/erpal/resource-types/manage/' . $type,
+        'bundle argument' => 4,
+      ),
+    );
+  }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function erpal_resource_permission() {
+  $permissions = array(
+    'administer resource types' => array(
+      'title' => t('Administer resource types'),
+      'description' => t('Allows users to configure resource types and their fields.'),
+      'restrict access' => TRUE,
+    ),
+  );
+
+  $permissions += erpal_core_entity_access_permissions('erpal_resource');
+
+  return $permissions;
+}
+
+/**
+ * Access callback for resource.
+ */
+function erpal_resource_access($op, $resource, $account = NULL, $entity_type = NULL) {
+  if (!isset($account)) {
+    $account = $GLOBALS['user'];
+  }
+  if (is_object($resource)) {
+    $resource_type = $resource->type;
+  }
+  else {
+    $resource_type = $resource;
+  }
+
+  if ($op != 'view') {
+    // First grant access to the entity for the specified operation if no other
+    // module denies it and at least one other module says to grant access.
+    $access_results = module_invoke_all('erpal_entity_access', $op, $resource, $account, $entity_type);
+
+    if (in_array(FALSE, $access_results, TRUE)) {
+      return FALSE;
+    }
+    elseif (in_array(TRUE, $access_results, TRUE)) {
+      return TRUE;
+    }
+  }
+
+  switch ($op) {
+    case 'create':
+      $access = (user_access('administer erpal_resource entities', $account)
+        || user_access('create erpal_resource entities', $account)
+        || user_access('create erpal_resource entities of bundle ' . $resource_type, $account));
+      return $access;
+
+    case 'view':
+      $access = (user_access('administer erpal_resource entities', $account)
+        || user_access('view any erpal_resource entity', $account)
+        || user_access('view any erpal_resource entity of bundle ' . $resource_type, $account));
+      return $access;
+
+    case 'edit':
+    case 'update':
+      $access = (user_access('administer erpal_resource entities', $account)
+        || user_access('edit any erpal_resource entity', $account)
+        || user_access('edit any erpal_resource entity of bundle ' . $resource_type));
+      return $access;
+
+    case 'delete':
+      $access = (user_access('administer erpal_resource entities', $account)
+        || user_access('delete any erpal_resource entity', $account)
+        || user_access('delete any erpal_resource entity of bundle ' . $resource_type));
+      return $access;
+
+    case 'create_view':
+      // Check if user has access permission to a view with
+      // create resource links.
+      if (user_access('administer erpal_resource entities', $account)
+        || user_access('create erpal_resource entities', $account)) {
+        return TRUE;
+      }
+      // Allow access if account has create permissions for any
+      // ERPAL core resource type.
+      foreach (array_keys(erpal_resource_types()) as $type) {
+        if (entity_access('create', 'erpal_resource', $type, $account)) {
+          return TRUE;
+        }
+      }
+      return FALSE;
+  }
+}
+
+/**
+ * Resource type access callback.
+ */
+function erpal_resource_type_access() {
+  return user_access('administer resource types');
+}
+
+/* ***************************************************************************
+ * ***  ERPAL resource helpers  ************************************************
+ * ************************************************************************* */
+
+/**
+ * Load a ERPAL resource object.
+ */
+function erpal_resource_load($resource_id, $reset = FALSE) {
+  if (empty($resource_id)) {
+    return array();
+  }
+
+  if ($resource_id !== FALSE) {
+    $resource_id = array($resource_id);
+  }
+
+  $resources = erpal_resource_load_multiple($resource_id, array(), $reset);
+  return reset($resources);
+}
+
+/**
+ * Load multiple resources based on certain conditions.
+ */
+function erpal_resource_load_multiple($resource_ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('erpal_resource', $resource_ids, $conditions, $reset);
+}
+
+/**
+ * Save single resource object to db. Wrapper for controller.
+ *
+ * @param object $resource
+ *   Entity object of erpal_resource type.
+ */
+function erpal_resource_save($resource) {
+  return entity_get_controller('erpal_resource')->save($resource);
+}
+
+/**
+ * Delete single resource.
+ *
+ * @todo This function should accept resource_id, but resource object.
+ *
+ * @param object $resource
+ *   Entity object of erpal_resource type.
+ */
+function erpal_resource_delete($resource) {
+  erpal_resource_delete_multiple(array($resource->resource_id));
+}
+
+/**
+ * Delete multiple resources. Wrapper for controller.
+ *
+ * @param array $resource_ids
+ *   array of entity ids that should be deleted.
+ */
+function erpal_resource_delete_multiple($resource_ids) {
+  entity_get_controller('erpal_resource')->delete($resource_ids);
+}
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function erpal_resource_field_extra_fields() {
+  $extra = array();
+
+  foreach (erpal_resource_types() as $type) {
+    $extra['erpal_resource'][$type->type] = array(
+      'form' => array(
+        'title' => array(
+          'label' => 'Title',
+          'description' => t('ERPAL resource module element.'),
+          'weight' => -5,
+        ),
+      ),
+      'display' => array(
+        'source' => array(
+          'label' => 'Source',
+          'description' => t('Source of ERPAL resource.'),
+          'weight' => -5,
+        ),
+      ),
+    );
+  }
+
+  return $extra;
+}
+
+/* ***************************************************************************
+ * ***  ERPAL resource Type helpers  *******************************************
+ * ************************************************************************* */
+
+/**
+ * Load resource Type.
+ */
+function erpal_resource_type_load($resource_type) {
+  return erpal_resource_types($resource_type);
+}
+
+/**
+ * List of resource Types.
+ */
+function erpal_resource_types($type_name = NULL) {
+  $types = entity_load_multiple_by_name('erpal_resource_type', isset($type_name) ? array($type_name) : FALSE);
+  return isset($type_name) ? reset($types) : $types;
+}
+
+/**
+ * Returns the human-readable names of an resource types.
+ *
+ * @return array
+ *   An array as used by hook_options_list().
+ */
+function erpal_resource_type_get_names() {
+  $names =& drupal_static(__FUNCTION__, array());
+  if (empty($names)) {
+    $types = erpal_resource_types();
+    foreach ($types as $type) {
+      $names[$type->type] = check_plain($type->label);
+    }
+  }
+
+  return $names;
+}
+
+
+/**
+ * Returns the human-readable name of an resource type.
+ *
+ * @param string $type_name
+ *   The machine name for an resource type.
+ *
+ * @return string
+ *   A human readable name for the resource type or FALSE.
+ */
+function erpal_resource_type_get_name($type_name) {
+  $names = erpal_resource_type_get_names();
+  if (isset($names[$type_name])) {
+    return $names[$type_name];
+  }
+  else {
+    return FALSE;
+  }
+}
+
+/**
+ * Creates or saves an resource type.
+ *
+ * @param object $resource_type
+ *   The resource type info to be saved
+ */
+function erpal_resource_type_save($resource_type) {
+  return entity_get_controller('erpal_resource_type')->save($resource_type);
+}
+
+/**
+ * Implements hook_erpal_resource_type_insert().
+ */
+function erpal_resource_erpal_resource_type_insert($resource_type) {
+  module_load_include('inc', 'erpal_resource', 'erpal_resource.admin');
+  erpal_resource_type_add_default_fields($resource_type);
+}
+
+/**
+ * Implements hook_forms().
+ *
+ * Create form for adding/editing erpal_resource.
+ * Their id is like 'erpal_resource_edit_' . $bundle . '_form'.
+ *
+ * @see entity_ui_get_form()
+ */
+function erpal_resource_forms($form_id, $args) {
+  $forms = array();
+
+  // Check whether it is erpal_resource form.
+  if (strpos($form_id, 'erpal_resource_edit_') === 0) {
+    $forms[$form_id] = array(
+      'callback' => 'erpal_resource_form',
+    );
+  }
+
+  return $forms;
+}
+
+/**
+ * Resource view callback.
+ */
+function erpal_resource_view($resource, $view_mode = 'full') {
+  $langcode = $GLOBALS['language_content']->language;
+  module_invoke_all('entity_view', $resource, 'erpal_resource', $view_mode, $langcode);
+
+  return $resource->content;
+}
+
+/**
+ * Resource view callback.
+ */
+function erpal_resource_erpal_resource_view($resource, $view_mode = 'full') {
+  $langcode = $GLOBALS['language_content']->language;
+  if (!empty($resource->source_id)) {
+    list($entity_type, $entity_bundle) = explode(ERPAL_RESOURCE_DELIMITER, $resource->type);
+    $entity = entity_load($entity_type, array($resource->source_id));
+    $entity = reset($entity);
+    $entity_label = entity_label($entity_type, $entity);
+    $entity_uri = entity_uri($entity_type, $entity);
+    $resource->content['source'] = array(
+      '#type' => 'item',
+      '#title' => t('Source'),
+      '#markup' => l($entity_label, $entity_uri['path']),
+    );
+  }
+  return $resource->content;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function erpal_resource_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'erpal_resource') . '/views',
+  );
+}
+
+/**
+ * Implements hook_feeds_plugins().
+ */
+function erpal_resource_feeds_plugins() {
+  $info['ERPALFeedsResourceProcessor'] = array(
+    'name' => 'ERPAL resource processor',
+    'description' => 'Create and update ERPAL resources.',
+    'help' => 'Create and update ERPAL resources from parsed content.',
+    'handler' => array(
+      'parent' => 'FeedsProcessor',
+      'class' => 'ERPALFeedsResourceProcessor',
+      'file' => 'ERPALFeedsResourceProcessor.inc',
+      'path' => drupal_get_path('module', 'erpal_resource') . '/includes',
+    ),
+  );
+  return $info;
+}
+
+/**
+ * Implements hook_file_download_access().
+ */
+function erpal_resource_file_download_access($file_item, $entity_type, $entity) {
+  if ($entity_type == 'erpal_resource') {
+    return erpal_resource_access('view', $entity);
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function erpal_resource_theme($existing, $type, $theme, $path) {
+  return array(
+    'resource' => array(
+      'render element' => 'elements',
+      'template' => 'resource',
+      'path' => $path . '/templates',
+    ),
+  );
+}
+
+/**
+ * Implements hook_preprocess().
+ */
+function erpal_resource_preprocess_resource(&$variables) {
+  $variables['view_mode'] = $variables['elements']['#view_mode'];
+  $variables['resource'] = $variables['elements']['#resource'];
+  $variables['content'] = entity_build_content('erpal_resource', $variables['resource']);
+
+  // Add classes based upon resource type.
+  $variables['classes_array'][] = 'resource';
+  $variables['classes_array'][] = 'resource-' . $variables['resource']->type;
+
+  $entity = $variables['resource'];
+  $variables['theme_hook_suggestions'][] = 'resource__' . $entity->type;
+  $variables['theme_hook_suggestions'][] = 'resource__' . $entity->resource_id;
+}
+
+/**
+ * Implements hook_services_resources().
+ */
+function erpal_resource_services_resources() {
+  // @todo Check access to resources.
+  $resources = array(
+    '#api_version' => 3002,
+    'erpal_resource' => array(
+      'operations' => array(
+        'retrieve' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_resource',
+            'name' => 'includes/erpal_resource_resource',
+          ),
+          'callback' => 'erpal_resource_load',
+          'args' => array(
+            array(
+              'name' => 'resource_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The resource_id of the resource to get.'),
+            ),
+          ),
+          'access callback' => '_erpal_resource_resource_access',
+          'access arguments' => array('view'),
+          'access arguments append' => TRUE,
+        ),
+        'create' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_resource',
+            'name' => 'includes/erpal_resource_resource',
+          ),
+          'callback' => '_erpal_resource_resource_create',
+          'args' => array(
+            array(
+              'name' => 'erpal_resource',
+              'optional' => FALSE,
+              'source' => 'data',
+              'description' => t('The erpal_resource data to create.'),
+              'type' => 'array',
+            ),
+          ),
+          'access callback' => '_erpal_resource_resource_access',
+          'access arguments' => array('create'),
+          'access arguments append' => TRUE,
+        ),
+        'update' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_resource',
+            'name' => 'includes/erpal_resource_resource',
+          ),
+          'callback' => '_node_resource_update',
+          'args' => array(
+            array(
+              'name' => 'resource_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The resource_id of the resource to get.'),
+            ),
+            array(
+              'name' => 'erpal_resource',
+              'optional' => FALSE,
+              'source' => 'data',
+              'description' => t('The erpal_resource data to create.'),
+              'type' => 'array',
+            ),
+          ),
+          'access callback' => '_erpal_resource_resource_access',
+          'access arguments' => array('update'),
+          'access arguments append' => TRUE,
+        ),
+        'delete' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_resource',
+            'name' => 'includes/erpal_resource_resource',
+          ),
+          'callback' => '_erpal_resource_resource_delete',
+          'args' => array(
+            array(
+              'name' => 'resource_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The resource_id of the resource to delete.'),
+            ),
+          ),
+          'access callback' => '_erpal_resource_resource_access',
+          'access arguments' => array('delete'),
+          'access arguments append' => TRUE,
+        ),
+        'index' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_resource',
+            'name' => 'includes/erpal_resource_resource',
+          ),
+          'callback' => '_erpal_resource_resource_index',
+          'args' => array(
+            array(
+              'name' => 'page',
+              'optional' => TRUE,
+              'type' => 'int',
+              'description' => 'The zero-based index of the page to get, defaults to 0.',
+              'default value' => 0,
+              'source' => array('param' => 'page'),
+            ),
+            array(
+              'name' => 'pagesize',
+              'optional' => TRUE,
+              'type' => 'int',
+              'description' => 'Number of records to get per page, defaults to 25.',
+              'default value' => 25,
+              'source' => array('param' => 'pagesize'),
+            ),
+          ),
+          'access callback' => '_erpal_resource_resource_access',
+          'access arguments' => array('view'),
+        ),
+      ),
+    ),
+  );
+
+  return $resources;
+}
+
+/**
+ * Helper to check uuid fields existence.
+ */
+function _erpal_resource_check_uuid() {
+  $schema_changed = FALSE;
+  module_load_include('install', 'uuid', 'uuid');
+  $field = uuid_schema_field_definition();
+  if (!db_field_exists('erpal_resource', 'uuid')) {
+    db_add_field('erpal_resource', 'uuid', $field);
+    db_add_index('erpal_resource', 'uuid', array('uuid'));
+    $schema_changed = TRUE;
+  }
+  if (!db_field_exists('erpal_resource_revision', 'vuuid')) {
+    db_add_field('erpal_resource_revision', 'vuuid', $field);
+    db_add_index('erpal_resource_revision', 'vuuid', array('vuuid'));
+    $schema_changed = TRUE;
+  }
+  if ($schema_changed) {
+    drupal_get_schema(NULL, TRUE);
+  }
+}
+
+/**
+ * Implements hook_uuid_sync().
+ */
+function erpal_resource_uuid_sync() {
+  _erpal_resource_check_uuid();
+}
+
+/**
+ * Implements hook_flush_caches().
+ */
+function erpal_resource_flush_caches() {
+  $resource_bundles = variable_get('erpal_resource_bundles', array());
+
+  $bundles = erpal_resource_types();
+  if (!empty($resource_bundles)) {
+    foreach ($resource_bundles as $resource_bundle) {
+      if (empty($bundles[$resource_bundle])) {
+        list($entity_type, $entity_bundle) = explode(ERPAL_RESOURCE_DELIMITER, $resource_bundle);
+        $entity = entity_get_info($entity_type);
+        // Create a default output type.
+        $output = entity_create('erpal_resource_type', array(
+          'type' => $resource_bundle,
+          'label' => t('Resource of !type - !bundle', array('!type' => $entity['label'], '!bundle' => $entity['bundles'][$entity_bundle]['label'])),
+          'description' => t('Default label.'),
+        ));
+        erpal_resource_type_save($output);
+
+        // Update field settings.
+        $bundles = drupal_map_assoc(array_keys($bundles));
+        $bundles[$resource_bundle] = $resource_bundle;
+        $field_info = field_info_field('field_resource');
+        $field_info['settings']['handler_settings']['target_bundles'] = $bundles;
+        field_update_field($field_info);
+      }
+    }
+  }
+
+  if (!empty($bundles)) {
+    foreach ($bundles as $bundle_name => $bundle) {
+      if (empty($resource_bundles[$bundle_name])) {
+
+        // Delete field reference.
+        module_load_include('inc', 'erpal_resource', 'erpal_resource.fields');
+        $instances = _erpal_resource_type_default_field_instances($bundle_name);
+        foreach ($instances as $instance) {
+          field_delete_instance($instance);
+        }
+      }
+    }
+  }
+
+}

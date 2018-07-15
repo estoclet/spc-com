@@ -1,0 +1,207 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall functions for the ERPAL resource module.
+ */
+
+/**
+ * Implements hook_enable().
+ */
+function erpal_resource_enable() {
+  // Clear the cache to display in Feeds as available plugin.
+  cache_clear_all('plugins:feeds:plugins', 'cache');
+  // Clear menu cache to displat entity links.
+  cache_clear_all(NULL, 'cache_menu');
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function erpal_resource_uninstall() {
+  $additional_params = array('include_inactive' => TRUE);
+  $instances = field_read_instances(array('entity_type' => 'erpal_resource'), $additional_params);
+  foreach ($instances as $instance) {
+    field_delete_instance($instance);
+  }
+}
+
+/**
+ * Implements hook_schema().
+ */
+function erpal_resource_schema() {
+  $schema = array();
+
+  $schema['erpal_resource'] = array(
+    'description' => 'The base table for resources.',
+    'fields' => array(
+      'resource_id' => array(
+        'description' => 'The primary identifier for an resource.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'revision_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => NULL,
+        'description' => 'Primary identifier of this {erpal_resource_revision}.',
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that owns this resource; initially, this is the user that created it.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'source_id' => array(
+        'description' => 'Id of source entity for which was created resource.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'type' => array(
+        'description' => 'The type (bundle) of this resource.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'title' => array(
+        'description' => 'The title of the resource.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the resource was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the resource was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'indexes' => array(
+      'created' => array('created'),
+      'changed' => array('changed'),
+    ),
+    'foreign keys' => array(
+      'resource_type' => array(
+        'table' => 'erpal_resource_type',
+        'columns' => array('type' => 'type'),
+      ),
+      'resource_revision' => array(
+        'table' => 'erpal_resource_revision',
+        'columns' => array('revision_id' => 'revision_id'),
+      ),
+    ),
+    'primary key' => array('resource_id'),
+  );
+
+  $schema['erpal_resource_revision'] = array(
+    'description' => 'Stores information about each saved revision of a {erpal_resource}',
+    'fields' => array(
+      'revision_id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary identifier of this {erpal_resource_revision}.',
+      ),
+      'resource_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => NULL,
+        'description' => 'The {erpal_resource}.resource_id for this revision.',
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that created this version.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'source_id' => array(
+        'description' => 'Id of source entity for which was created resource.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'title' => array(
+        'description' => 'The title of the resource.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the resource was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the resource was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'foreign keys' => array(
+      'versioned_resource' => array(
+        'table' => 'erpal_resource',
+        'columns' => array('resource_id' => 'resource_id'),
+      ),
+      'version_creator' => array(
+        'table' => 'user',
+        'columns' => array('uid' => 'uid'),
+      ),
+    ),
+    'primary key' => array('revision_id'),
+  );
+
+  $schema['erpal_resource_type'] = array(
+    'description' => 'Stores information about all defined resource types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique resource type ID.',
+      ),
+      'type' => array(
+        'description' => 'The machine-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'description' => array(
+        'description' => 'A brief description of this type.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium',
+        'translatable' => TRUE,
+      ),
+    ) + entity_exportable_schema_fields(),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'type' => array('type'),
+    ),
+  );
+
+  if (module_exists('uuid')) {
+    $field = uuid_schema_field_definition();
+    $schema['erpal_resource']['fields']['uuid'] = $field;
+    $schema['erpal_resource']['indexes']['uuid'] = array('uuid');
+    $schema['erpal_resource_revision']['fields']['vuuid'] = $field;
+    $schema['erpal_resource_revision']['indexes']['vuuid'] = array('vuuid');
+  }
+
+  return $schema;
+}

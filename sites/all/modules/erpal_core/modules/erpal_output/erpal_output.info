@@ -1,0 +1,32 @@
+name = ERPAL Output
+description = Provides an entity for recording work results
+package = ERPAL Core
+core = 7.x
+
+; Field dependencies
+dependencies[] = date_api
+dependencies[] = date
+dependencies[] = date_popup
+dependencies[] = date_views
+dependencies[] = erpal_budget
+dependencies[] = entityreference
+dependencies[] = list
+dependencies[] = mvf
+dependencies[] = rules_conditional
+
+; Dynamic-loading code registry
+files[] = includes/controller.inc
+
+; Views handlers
+files[] = views/handlers/erpal_output_handler_field_links.inc
+
+; Other files
+files[] = includes/ERPALOutput_SelectionHandler_BudgetsField.inc
+files[] = includes/ERPALOutputInlineEntityFormController.inc
+
+; Information added by Drupal.org packaging script on 2016-09-29
+version = "7.x-3.0-alpha1+42-dev"
+core = "7.x"
+project = "erpal_core"
+datestamp = "1475156341"
+

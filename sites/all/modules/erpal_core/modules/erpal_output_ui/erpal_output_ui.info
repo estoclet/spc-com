@@ -1,0 +1,22 @@
+name = ERPAL Output UI
+description = User Interface for output entities.
+package = ERPAL Core
+core = 7.x
+configure = admin/structure/erpal/output-types
+
+; =======================
+; Dependencies
+; =======================
+
+; Core Dependencies
+dependencies[] = erpal_output
+dependencies[] = erpal_budget_ui
+dependencies[] = views_bulk_operations
+
+
+; Information added by Drupal.org packaging script on 2016-09-29
+version = "7.x-3.0-alpha1+42-dev"
+core = "7.x"
+project = "erpal_core"
+datestamp = "1475156341"
+

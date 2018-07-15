@@ -1,0 +1,158 @@
+<?php
+
+/**
+ * @file
+ * Provides the UI for viewing resources.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function erpal_resource_ui_menu() {
+  $resource_paths = array(
+    'resource_add' => 'admin/erpal/add-content/resource/add',
+  );
+  foreach ($resource_paths as $key => $path) {
+    $items[$path] = array(
+      'title' => 'Add an resource',
+      'page callback' => 'erpal_resource_ui_add_resource',
+      'access callback' => 'entity_access',
+      'access arguments' => array('create_view', 'erpal_resource'),
+      'type' => MENU_NORMAL_ITEM,
+      'file' => 'erpal_resource_ui.pages.inc',
+      'weight' => 5,
+    );
+
+    foreach (erpal_resource_types() as $type => $info) {
+      $items[$path . '/' . $type] = array(
+        'title' => 'Add resource @type',
+        'title arguments' => array('@type' => $info->label),
+        'description' => $info->description,
+        'page callback' => 'erpal_resource_entity_ui_get_form_wrapper',
+        'page arguments' => array(5),
+        'access callback' => 'entity_access',
+        'access arguments' => array('create', 'erpal_resource', $type),
+        'type' => MENU_NORMAL_ITEM,
+        'file' => 'erpal_resource_ui.pages.inc',
+      );
+    }
+  }
+
+  $items['erpal/resource/%erpal_resource/view'] = array(
+    'title' => 'View',
+    'weight' => -10,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+  );
+
+  $items['erpal/resource/%erpal_resource/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'entity_ui_get_form',
+    'page arguments' => array('erpal_resource', 2, 'edit'),
+    'access callback' => 'entity_access',
+    'access arguments' => array('edit', 'erpal_resource', 2),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'erpal_resource_ui.pages.inc',
+  );
+  $items['erpal/resource/%erpal_resource/delete'] = array(
+    'title' => 'Delete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('erpal_resource_form_delete_confirm', 2),
+    'access callback' => 'entity_access',
+    'access arguments' => array('edit', 'erpal_resource', 2),
+    'weight' => 1,
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'erpal_resource_ui.pages.inc',
+  );
+  $items['admin/structure/erpal/resource-types/list'] = array(
+    'title' => 'List',
+    'weight' => -10,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['admin/erpal/settings/resource'] = array(
+    'title' => 'Resource Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('erpal_resource_settings_form'),
+    'access arguments' => array('administer resource types'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'erpal_resource_ui.pages.inc',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_admin_menu_map().
+ */
+function erpal_resource_ui_admin_menu_map() {
+  $map = $arguments = array();
+  $erpal_resource_types = array_keys(erpal_resource_types());
+  foreach ($erpal_resource_types as $type) {
+    $arguments[] = array(
+      '%erpal_resource_type' => array($type),
+      '%entity_object' => array($type),
+    );
+  }
+  if ($arguments) {
+    $map['admin/erpal/resource-types/manage/%erpal_resource_type'] = array(
+      // Link generated items directly to the "resource Types" item.
+      'parent' => 'admin/erpal/resource-types',
+      // Hide the "List" item, as this expansion will expose all available
+      // options.
+      'hide' => 'admin/erpal/resource-types/list',
+      // Create expansion arguments for the '%erpal_resource_type' placeholder.
+      'arguments' => $arguments,
+    );
+  }
+
+  return $map;
+}
+
+/**
+ * Implements hook_ctools_plugin_api().
+ *
+ * We provide our default pages for page_manager.
+ */
+function erpal_resource_ui_ctools_plugin_api($module = NULL, $api = NULL) {
+  if ($module == "page_manager" && $api == "pages_default") {
+    return array("version" => "1");
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function erpal_resource_ui_form_alter(&$form, &$form_state, $form_id) {
+  // Alter the operations links so they looks like CTools dropbutton.
+  if ($form_id == 'erpal_resource_type_overview_form') {
+    $ops_count = $form['table']['#header'][2]['colspan'];
+    $form['table']['#header'][2] = t('Operations');
+
+    erpal_core_ui_ctools_add_dropbutton_files();
+    foreach ($form['table']['#rows'] as $key => $row) {
+      $resource = theme('erpal_core_ui_ctools_dropbutton', array(
+        'ops_count' => $ops_count,
+        'links' => $row,
+        'index' => $key,
+      ));
+
+      $form['table']['#rows'][$key] = array_merge(array_slice($row, 0, count($row) - $ops_count), array($resource));
+    }
+  }
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function erpal_resource_ui_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'erpal_resource_ui') . '/views',
+  );
+}
+
+/**
+ * Resource UI view callback.
+ */
+function erpal_resource_ui_view($resource) {
+  return erpal_resource_view($resource);
+}

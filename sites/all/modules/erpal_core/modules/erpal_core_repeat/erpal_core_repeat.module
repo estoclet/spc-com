@@ -1,0 +1,156 @@
+<?php
+/**
+ * @file
+ *
+ * Adds repeatable functionality for ERPAL Budget and Output entities.
+ */
+
+/**
+ * Field for which repeat widget will be added.
+ */
+define('ERPAL_CORE_REPEAT_DATE_FIELD', 'field_erpal_core_repeat_date');
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Adds custom submit function to edit budget entity.
+ */
+function erpal_core_repeat_form_alter(&$form, &$form_state, $form_id) {
+  $enabled_types = variable_get('erpal_core_repeat_enabled_types', array());
+
+  // Budget or Output type edit forms
+  if ($form_id == 'erpal_budget_type_form' || $form_id == 'erpal_output_type_form') {
+    module_load_include('inc', 'erpal_core_repeat', 'includes/erpal_core_repeat.admin');
+
+    _erpal_core_repeat_type_form_alter($form, $form_state);
+  }
+  // Check if erpal_core_repeat enabled for current form.
+  elseif (in_array($form_id, $enabled_types)) {
+    module_load_include('inc', 'erpal_core_repeat', 'includes/erpal_core_repeat.pages');
+
+    _erpal_core_repeat_entity_form_alter($form, $form_state);
+  }
+}
+
+/**
+ * Alter the date_combo element after the Date module is finished with it.
+ *
+ * Adds repeat widget for ERPAL budget date field.
+ */
+function erpal_core_repeat_date_combo_process_alter(&$element, &$form_state, $context) {
+  $field = $context['field'];
+  $instance = $context['instance'];
+  $field_name = $element['#field_name'];
+  $delta = $element['#delta'];
+
+  // Add a date repeat form element, if needed.
+  // We delayed until this point so we don't bother adding it to hidden fields.
+  if ($field_name == ERPAL_CORE_REPEAT_DATE_FIELD) {
+    $item = $element['#value'];
+    $element['#element_validate'][] = 'erpal_core_repeat_field_widget_validate';
+    $element['show_repeat_settings'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Repeat'),
+      '#weight' => $instance['widget']['weight'] + .3,
+      '#prefix' => '<div class="date-clear">',
+      '#suffix' => '</div>',
+      '#default_value' => isset($items[$delta]['rrule']) && !empty($items[$delta]['rrule']) ? 1 : 0,
+    );
+    $element['rrule'] = array(
+      '#type' => 'date_repeat_rrule',
+      '#theme_wrappers' => array('date_repeat_rrule'),
+      '#default_value' => isset($item['rrule']) ? $item['rrule'] : '',
+      '#date_timezone' => $element['#date_timezone'],
+      '#date_format'      => date_limit_format(date_input_format($element, $field, $instance), $field['settings']['granularity']),
+      '#date_text_parts'  => (array) $instance['widget']['settings']['text_parts'],
+      '#date_increment'   => $instance['widget']['settings']['increment'],
+      '#date_year_range'  => $instance['widget']['settings']['year_range'],
+      '#date_label_position' => $instance['widget']['settings']['label_position'],
+      '#date_repeat_widget' => str_replace('_repeat', '', $instance['widget']['type']),
+      '#date_repeat_collapsed' => $instance['widget']['settings']['repeat_collapsed'],
+      '#date_flexible' => 0,
+      '#weight' => $instance['widget']['weight'] + .4,
+    );
+  }
+}
+
+/**
+ * Validation for date repeat form element.
+ *
+ * Create multiple values from the RRULE results and store it in $form_state.
+ */
+function erpal_core_repeat_field_widget_validate($element, &$form_state) {
+  $field = field_widget_field($element, $form_state);
+
+  $item = drupal_array_get_nested_value($form_state['values'], $element['#parents'], $input_exists);
+  $input = drupal_array_get_nested_value($form_state['input'], $element['#parents'], $input_exists);
+  $rrule_values = date_repeat_merge($input['rrule'], $element['rrule']);
+
+  // If no start date was set, clean up the form and return.
+  if (empty($item['value'])) {
+    form_set_value($element, NULL, $form_state);
+    return;
+  }
+
+  // Require the UNTIL date for now.
+  // The RRULE has already been created by this point, so go back
+  // to the posted values to see if this was filled out.
+  $error_field_base = implode('][', $element['#parents']);
+  $error_field_until =  $error_field_base . '][rrule][until_child][datetime][';
+  if (!empty($item['rrule']) && $rrule_values['range_of_repeat'] === 'UNTIL' && empty($rrule_values['UNTIL']['datetime'])) {
+    form_set_error($error_field_until . 'date', t("Missing value in 'Range of repeat'. (UNTIL).", array(), array('context' => 'Date repeat')));
+  }
+
+  $error_field_count = $error_field_base . '][rrule][count_child';
+  if (!empty($item['rrule']) && $rrule_values['range_of_repeat'] === 'COUNT' && empty($rrule_values['COUNT'])) {
+    form_set_error($error_field_count, t("Missing value in 'Range of repeat'. (COUNT).", array(), array('context' => 'Date repeat')));
+  }
+
+  if (form_get_errors()) {
+    return;
+  }
+
+  // If the rule, the start date, or the end date have changed, re-calculate
+  // the repeating dates, wipe out the previous values, and populate the
+  // field with the new values.
+  $rrule = $item['rrule'];
+  if (!empty($rrule)) {
+
+    // Avoid undefined index problems on dates that don't have all parts.
+    $possible_items = array('value', 'value2', 'timezone', 'offset', 'offset2');
+    foreach ($possible_items as $key) {
+      if (empty($item[$key])) {
+        $item[$key] = '';
+      }
+    }
+
+    // We only collect a date for UNTIL, but we need it to be inclusive,
+    // so force it to a full datetime element at the last possible second of the day.
+    if (!empty($rrule_values['UNTIL'])) {
+      $rrule_values['UNTIL']['datetime'] .= ' 23:59:59';
+      $rrule_values['UNTIL']['granularity'] = serialize(drupal_map_assoc(array('year', 'month', 'day', 'hour', 'minute', 'second')));
+      $rrule_values['UNTIL']['all_day'] = 0;
+    }
+
+    // Generate dates for RRULE.
+    $value = date_repeat_build_dates($item['rrule'], $rrule_values, $field, $item);
+
+    // Save created dates to $form_state, it will be used in form submit function.
+    $form_state['erpal_repeat_dates'] = $value;
+  }
+}
+
+/**
+ * Clone ERPAL entity.
+ */
+function _erpal_core_repeat_clone_entity($entity) {
+
+  $clone_entity = clone $entity;
+  $clone_entity->is_new = TRUE;
+  $clone_entity->revision_id = NULL;
+  $clone_entity->vuuid = NULL;
+  $clone_entity->uuid = NULL;
+  $clone_entity->default_revision = NULL;
+
+  return $clone_entity;
+}

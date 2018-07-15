@@ -1,0 +1,23 @@
+name = ERPAL Budget UI
+description = User Interface for budget entities.
+package = ERPAL Core
+core = 7.x
+configure = admin/structure/erpal/budget-types
+
+; =======================
+; Dependencies
+; =======================
+
+; Core Dependencies
+dependencies[] = erpal_core_ui
+dependencies[] = erpal_resource_ui
+dependencies[] = erpal_budget
+dependencies[] = views_bulk_operations
+dependencies[] = units_ui
+
+; Information added by Drupal.org packaging script on 2016-09-29
+version = "7.x-3.0-alpha1+42-dev"
+core = "7.x"
+project = "erpal_core"
+datestamp = "1475156341"
+

@@ -1,0 +1,759 @@
+<?php
+
+/**
+ * @file
+ * Provides an entity for recording work results.
+ */
+
+/**
+ * Include file with hook_property_info().
+ */
+module_load_include('inc', 'erpal_budget', 'erpal_budget.info');
+
+/**
+ * Implements hook_entity_info().
+ */
+function erpal_budget_entity_info() {
+  $return = array(
+    'erpal_budget' => array(
+      'label' => t('ERPAL Budget'),
+      'entity class' => 'ERPALBudgetEntity',
+      'inline entity form' => array('controller' => 'ERPALBudgetInlineEntityFormController'),
+      'controller class' => 'ERPALBudgetController',
+      'base table' => 'erpal_budget',
+      'revision table' => 'erpal_budget_revision',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'budget_id',
+        'bundle' => 'type',
+        'label' => 'title',
+        'revision' => 'revision_id',
+      ),
+      'bundle keys' => array(
+        'bundle' => 'type',
+      ),
+      'bundles' => array(),
+      'load hook' => 'erpal_budget_load',
+      'view modes' => array(
+        'full' => array(
+          'label' => t('Full content'),
+          'custom settings' => FALSE,
+        ),
+      ),
+      'label callback' => 'entity_class_label',
+      'uri callback' => 'entity_class_uri',
+      'access callback' => 'erpal_budget_access',
+      'module' => 'erpal_budget',
+      'permission labels' => array(
+        'singular' => t('budget'),
+        'plural' => t('budgets'),
+      ),
+    ),
+  );
+  $return['erpal_budget_type'] = array(
+    'label' => t('ERPAL Budget Type'),
+    'entity class' => 'ERPALBudgetType',
+    'controller class' => 'ERPALBudgetTypeController',
+    'base table' => 'erpal_budget_type',
+    'fieldable' => FALSE,
+    'bundle of' => 'erpal_budget',
+    'exportable' => TRUE,
+    'entity keys' => array(
+      'id' => 'id',
+      'name' => 'type',
+      'label' => 'label',
+    ),
+    'module' => 'erpal_budget',
+    // Enable the entity API's admin UI.
+    'admin ui' => array(
+      'path' => 'admin/erpal/budget-types',
+      'file' => 'erpal_budget.admin.inc',
+      'controller class' => 'EntityDefaultUIController',
+    ),
+    'access callback' => 'erpal_budget_type_access',
+  );
+
+  if (module_exists('uuid')) {
+    $return['erpal_budget']['uuid'] = TRUE;
+    $return['erpal_budget']['entity keys']['uuid'] = 'uuid';
+    $return['erpal_budget']['entity keys']['revision uuid'] = 'vuuid';
+  }
+
+  return $return;
+}
+
+/**
+ * Implements hook_entity_info_alter().
+ *
+ * Use this hook to specify budget bundles to avoid a recursion, as loading
+ * the budget types needs the entity info too.
+ */
+function erpal_budget_entity_info_alter(&$entity_info) {
+  foreach (erpal_budget_types() as $type => $info) {
+    $entity_info['erpal_budget']['bundles'][$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/erpal/budget-types/manage/%erpal_budget_type',
+        'real path' => 'admin/erpal/budget-types/manage/' . $type,
+        'bundle argument' => 4,
+      ),
+    );
+  }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function erpal_budget_permission() {
+  $permissions = array(
+    'administer budget types' => array(
+      'title' => t('Administer budget types'),
+      'description' => t('Allows users to configure budget types and their fields.'),
+      'restrict access' => TRUE,
+    ),
+  );
+
+  $permissions += erpal_core_entity_access_permissions('erpal_budget');
+
+  return $permissions;
+}
+
+/**
+ * Access callback for budget.
+ */
+function erpal_budget_access($op, $budget, $account = NULL, $entity_type = NULL) {
+  if (!isset($account)) {
+    $account = $GLOBALS['user'];
+  }
+  if (is_object($budget)) {
+    $budget_type = $budget->type;
+  }
+  else {
+    $budget_type = $budget;
+  }
+
+  if ($op != 'view') {
+    // First grant access to the entity for the specified operation if no other
+    // module denies it and at least one other module says to grant access.
+    $access_results = module_invoke_all('erpal_entity_access', $op, $budget, $account, $entity_type);
+
+    if (in_array(FALSE, $access_results, TRUE)) {
+      return FALSE;
+    }
+    elseif (in_array(TRUE, $access_results, TRUE)) {
+      return TRUE;
+    }
+  }
+
+  switch ($op) {
+    case 'create':
+      $access = (user_access('administer erpal_budget entities', $account)
+        || user_access('create erpal_budget entities', $account)
+        || user_access('create erpal_budget entities of bundle ' . $budget_type, $account));
+      return $access;
+
+    case 'view':
+      $access = (user_access('administer erpal_budget entities', $account)
+        || user_access('view any erpal_budget entity', $account)
+        || user_access('view any erpal_budget entity of bundle ' . $budget_type, $account));
+      return $access;
+
+    case 'edit':
+    case 'update':
+      $access = (user_access('administer erpal_budget entities', $account)
+        || user_access('edit any erpal_budget entity', $account)
+        || user_access('edit any erpal_budget entity of bundle ' . $budget_type));
+      return $access;
+
+    case 'delete':
+      $access = (user_access('administer erpal_budget entities', $account)
+        || user_access('delete any erpal_budget entity', $account)
+        || user_access('delete any erpal_budget entity of bundle ' . $budget_type));
+      return $access;
+
+    case 'create_view':
+      // Check if user has access permission to a view with create budget links.
+      if (user_access('administer erpal_budget entities', $account)
+        || user_access('create erpal_budget entities', $account)) {
+        return TRUE;
+      }
+      // Allow access if account has create permissions
+      // for any ERPAL core budget type.
+      foreach (array_keys(erpal_budget_types()) as $type) {
+        if (entity_access('create', 'erpal_budget', $type, $account)) {
+          return TRUE;
+        }
+      }
+      return FALSE;
+  }
+}
+
+/**
+ * Budget type access callback.
+ */
+function erpal_budget_type_access() {
+  return user_access('administer budget types');
+}
+
+/* ***************************************************************************
+ * ***  ERPAL budget helpers  ************************************************
+ * ************************************************************************* */
+
+/**
+ * Load a ERPAL budget object.
+ */
+function erpal_budget_load($budget_id, $reset = FALSE) {
+  if (empty($budget_id)) {
+    return array();
+  }
+
+  if ($budget_id !== FALSE) {
+    $budget_id = array($budget_id);
+  }
+
+  $budgets = erpal_budget_load_multiple($budget_id, array(), $reset);
+  return reset($budgets);
+}
+
+/**
+ * Load multiple budgets based on certain conditions.
+ */
+function erpal_budget_load_multiple($budget_ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('erpal_budget', $budget_ids, $conditions, $reset);
+}
+
+/**
+ * Save single budget object to db. Wrapper for controller.
+ *
+ * @param object $budget
+ *   Entity object of erpal_budget type.
+ */
+function erpal_budget_save($budget) {
+  return entity_get_controller('erpal_budget')->save($budget);
+}
+
+/**
+ * Delete single budget.
+ *
+ * @todo This function should accept budget_id, but budget object.
+ *
+ * @param object $budget
+ *   Entity object of erpal_budget type.
+ */
+function erpal_budget_delete($budget) {
+  if (!$budget->isLocked()) {
+    erpal_budget_delete_multiple(array($budget->budget_id));
+  }
+  else {
+    drupal_set_message(t('Budget %budget_title can\'t be removed. It is locked.', array('%budget_title' => $budget->title)), 'error');
+  }
+}
+
+/**
+ * Delete multiple budgets. Wrapper for controller.
+ *
+ * @param array $budget_ids
+ *   array of entity ids that should be deleted.
+ */
+function erpal_budget_delete_multiple($budget_ids) {
+  entity_get_controller('erpal_budget')->delete($budget_ids);
+}
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function erpal_budget_field_extra_fields() {
+  $extra = array();
+
+  foreach (erpal_budget_types() as $type) {
+    $form_elements['title'] = array(
+      'label' => t('Title'),
+      'description' => t('ERPAL budget module element'),
+      'weight' => -5,
+    );
+    $display_elements['title'] = array(
+      'label' => t('Title'),
+      'description' => t('ERPAL budget module element'),
+      'weight' => -5,
+    );
+
+    $extra['erpal_budget'][$type->type]['form'] = $form_elements;
+    $extra['erpal_budget'][$type->type]['display'] = $display_elements;
+  }
+
+  return $extra;
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function erpal_budget_field_formatter_info() {
+  $field_types = array_keys(module_invoke('mvf', 'field_info'));
+  $settings = array(
+    'unit' => array(),
+    'value' => array(),
+    'mvf' => array(
+      'unit_suggesters_settings' => array(),
+    ),
+    'total_field' => 'field_budget_total',
+  );
+  return array(
+    'erpal_budget_formatter_default' => array(
+      'label' => t('Erpal Budget Default'),
+      'description' => t('Default formatter for unit measured field in Budget.'),
+      'field types' => $field_types,
+      'settings' => $settings,
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_prepare_view().
+ */
+function erpal_budget_field_formatter_prepare_view($entity_type, $entities, $field, $instances, $langcode, &$items, $displays) {
+  mvf_field_formatter_prepare_view($entity_type, $entities, $field, $instances, $langcode, $items, $displays);
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function erpal_budget_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+
+  $element = array();
+
+  // In order to successfully mock up instance for a sub field, we have to know
+  // view mode that corresponds to the supplied $display. We could compare each
+  // display in $instance trying to find the one that equals to $display.
+  // It seems easier just to extend $instance['display'] with $display
+  // and then catch it out in $mocked_instance
+  $mocked_view_mode = 'mvf_dummy_view_mode';
+  $instance['display'][$mocked_view_mode] = $display;
+
+
+  // Sort by weight the subfields.
+  uasort($instance['widget']['settings']['meta_info'], 'drupal_sort_weight');
+
+  foreach ($items as $delta => $item) {
+    $element[$delta] = array();
+
+    // Take all data for field total.
+    $instance_total = field_read_instance($entity_type, $display['settings']['total_field'], $instance['bundle']);
+    $instance_total['display'][$mocked_view_mode] = $display;
+    $field_total = field_info_field_by_id($instance_total['field_id']);
+
+    // Prepare all fields which need for culculation.
+    $fields = array(
+      'available' => array(
+        'instance' => $instance,
+        'field' => $field,
+      ),
+      'total' => array(
+        'instance' => $instance_total,
+        'field' => $field_total,
+      ),
+    );
+
+    // Prepare all data for calculation.
+    $data = array();
+    foreach ($fields as $field_key => $field_data) {
+      foreach ($field_data['instance']['widget']['settings']['meta_info'] as $subfield => $meta_info) {
+        // We are supposed to delegate formatting of this subfield to the sub
+        // formatter, whatever sub formatter was chosen in the settings of our
+        // superior formatter.
+        $mocked_field = mvf_field_mockup($field_data['field'], $subfield);
+        $mocked_instance = mvf_instance_mockup($field_data['field'], $field_data['instance'], $subfield);
+        $mocked_display = $mocked_instance['display'][$mocked_view_mode];
+        unset($mocked_instance['display'][$mocked_view_mode]);
+        $mocked_delta = 0;
+
+         // Check if entityreference field prepared in correct way.
+        if (empty($entity->{$field_data['instance']['field_name']}[$langcode][$mocked_delta]['entity'])) {
+          $entity->{$field_data['instance']['field_name']}[$langcode][$mocked_delta]['entity'] = units_unit_load($entity->{$field_data['instance']['field_name']}[$langcode][$mocked_delta]['target_id']);
+          $entity->{$field_data['instance']['field_name']}[$langcode][$mocked_delta]['access'] = TRUE;
+        }
+
+        $mocked_items = array($mocked_delta => $entity->{$field_data['instance']['field_name']}[$langcode][$mocked_delta]);
+        $extra = module_invoke($mocked_display['module'], 'field_formatter_view', $entity_type, $entity, $mocked_field, $mocked_instance, $langcode, $mocked_items, $mocked_display);
+        $data[$field_key . '_' . $subfield] = $extra[0]['#markup'];
+        $data[$field_key . '_entity'] = $entity->{$field_data['instance']['field_name']}[$langcode][$mocked_delta]['entity'];
+      }
+    }
+
+    // If budget is negative - add class negative.
+    $class = 'not-negative';
+    if ($data['available_value'] < 0)  {
+      $class = 'is-negative';
+      $negative = 1;
+    }
+
+    // Delete number format settings from numbers.
+    $data['total_value'] = str_replace(' ', '', $data['total_value']);
+    $data['available_value'] = str_replace(' ', '', $data['available_value']);
+
+    // Before calculation we should have same unit in total and available fields.
+    $unit = units_convert($data['total_value'],
+              $data['total_entity']->machine_name, $data['available_entity']->machine_name);
+
+    $used = $unit - $data['available_value'];
+
+    // Prepare render array with all date for budget available widget.
+    $element[$delta] = array(
+      '#theme' => 'erpal_budget_formatter_default',
+      '#class' => $class,
+      '#available' => $data['available_value'] . ' ' . $data['available_unit'] ,
+      '#available_percentage' => round(($data['available_value'] / $unit) * 100),
+      '#total' => number_format((float) $unit, 2, '.', '') . ' ' . $data['available_unit'],
+      '#used_percentage' => empty($negative) ? round(($used / $unit) * 100) : 100,
+      '#used' => number_format((float) $used, 2, '.', ''),
+    );
+  }
+  return $element;
+}
+
+/* ***************************************************************************
+ * ***  ERPAL budget Type helpers  *******************************************
+ * ************************************************************************* */
+
+/**
+ * Load budget Type.
+ */
+function erpal_budget_type_load($budget_type) {
+  return erpal_budget_types($budget_type);
+}
+
+/**
+ * List of budget Types.
+ */
+function erpal_budget_types($type_name = NULL) {
+  $types = entity_load_multiple_by_name('erpal_budget_type', isset($type_name) ? array($type_name) : FALSE);
+  return isset($type_name) ? reset($types) : $types;
+}
+
+/**
+ * Returns the human-readable names of an budget types.
+ *
+ * @return array
+ *   An array as used by hook_options_list().
+ */
+function erpal_budget_type_get_names() {
+  $names =& drupal_static(__FUNCTION__, array());
+  if (empty($names)) {
+    $types = erpal_budget_types();
+    foreach ($types as $type) {
+      $names[$type->type] = check_plain($type->label);
+    }
+  }
+
+  return $names;
+}
+
+
+/**
+ * Returns the human-readable name of an budget type.
+ *
+ * @param string $type_name
+ *   The machine name for an budget type.
+ *
+ * @return string
+ *   A human readable name for the budget type or FALSE.
+ */
+function erpal_budget_type_get_name($type_name) {
+  $names = erpal_budget_type_get_names();
+  if (isset($names[$type_name])) {
+    return $names[$type_name];
+  }
+  else {
+    return FALSE;
+  }
+}
+
+/**
+ * Creates or saves an budget type.
+ *
+ * @param object $budget_type
+ *   The budget type info to be saved
+ */
+function erpal_budget_type_save($budget_type) {
+  return entity_get_controller('erpal_budget_type')->save($budget_type);
+}
+
+/**
+ * Implements hook_erpal_budget_type_insert().
+ */
+function erpal_budget_erpal_budget_type_insert($budget_type) {
+  module_load_include('inc', 'erpal_budget', 'erpal_budget.admin');
+  $unit_type = variable_get('budget_' . $budget_type->type, 'time');
+  erpal_budget_type_add_default_fields($budget_type, $unit_type);
+}
+
+/**
+ * Implements hook_forms().
+ *
+ * Create form for adding/editing erpal_budget.
+ * Their id is like 'erpal_budget_edit_' . $bundle . '_form'.
+ *
+ * @see entity_ui_get_form()
+ */
+function erpal_budget_forms($form_id, $args) {
+  $forms = array();
+
+  // Check whether it is erpal_budget form.
+  if (strpos($form_id, 'erpal_budget_edit_') === 0) {
+    $forms[$form_id] = array(
+      'callback' => 'erpal_budget_form',
+    );
+  }
+
+  return $forms;
+}
+
+/**
+ * Budget view callback.
+ */
+function erpal_budget_view($budget, $view_mode = 'full') {
+  $langcode = $GLOBALS['language_content']->language;
+  module_invoke_all('entity_view', $budget, 'erpal_budget', $view_mode, $langcode);
+  $build = $budget->view('full', $langcode);
+
+  return $build;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function erpal_budget_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'erpal_budget') . '/views',
+  );
+}
+
+/**
+ * Implements hook_feeds_plugins().
+ */
+function erpal_budget_feeds_plugins() {
+  $info['ERPALFeedsBudgetProcessor'] = array(
+    'name' => 'ERPAL budget processor',
+    'description' => 'Create and update ERPAL budgets.',
+    'help' => 'Create and update ERPAL budgets from parsed content.',
+    'handler' => array(
+      'parent' => 'FeedsProcessor',
+      'class' => 'ERPALFeedsBudgetProcessor',
+      'file' => 'ERPALFeedsBudgetProcessor.inc',
+      'path' => drupal_get_path('module', 'erpal_budget') . '/includes',
+    ),
+  );
+  return $info;
+}
+
+/**
+ * Implements hook_file_download_access().
+ */
+function erpal_budget_file_download_access($file_item, $entity_type, $entity) {
+  if ($entity_type == 'erpal_budget') {
+    return erpal_budget_access('view', $entity);
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function erpal_budget_theme($existing, $type, $theme, $path) {
+  return array(
+    'budget' => array(
+      'render element' => 'elements',
+      'template' => 'budget',
+      'path' => $path . '/templates',
+    ),
+    'erpal_budget_formatter_default' => array(
+      'variables' => array(
+        'class' => '',
+        'available' => '',
+        'available_percentage' => '',
+        'total' => '',
+        'used_percentage' => '',
+        'used' => '',
+      ),
+      'template' => 'erpal_budget_formatter_default',
+      'path' => $path . '/templates',
+    ),
+  );
+}
+
+/**
+ * Implements hook_preprocess().
+ */
+function erpal_budget_preprocess_budget(&$variables) {
+  $variables['view_mode'] = $variables['elements']['#view_mode'];
+  $variables['budget'] = $variables['elements']['#budget'];
+  $variables['content'] = entity_build_content('erpal_budget', $variables['budget']);
+
+  // Add classes based upon budget type.
+  $variables['classes_array'][] = 'budget';
+  $variables['classes_array'][] = 'budget-' . $variables['budget']->type;
+
+  $entity = $variables['budget'];
+  $variables['theme_hook_suggestions'][] = 'budget__' . $entity->type;
+  $variables['theme_hook_suggestions'][] = 'budget__' . $entity->budget_id;
+}
+
+
+/**
+ * Implements hook_services_resources().
+ */
+function erpal_budget_services_resources() {
+  // @todo Check access to resources.
+  $resources = array(
+    '#api_version' => 3002,
+    'erpal_budget' => array(
+      'operations' => array(
+        'retrieve' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_budget',
+            'name' => 'includes/erpal_budget_resource',
+          ),
+          'callback' => 'erpal_budget_load',
+          'args' => array(
+            array(
+              'name' => 'budget_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The budget_id of the budget to get.'),
+            ),
+          ),
+          'access callback' => '_erpal_budget_resource_access',
+          'access arguments' => array('view'),
+          'access arguments append' => TRUE,
+        ),
+        'create' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_budget',
+            'name' => 'includes/erpal_budget_resource',
+          ),
+          'callback' => '_erpal_budget_resource_create',
+          'args' => array(
+            array(
+              'name' => 'erpal_budget',
+              'optional' => FALSE,
+              'source' => 'data',
+              'description' => t('The erpal_budget data to create.'),
+              'type' => 'array',
+            ),
+          ),
+          'access callback' => '_erpal_budget_resource_access',
+          'access arguments' => array('create'),
+          'access arguments append' => TRUE,
+        ),
+        'update' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_budget',
+            'name' => 'includes/erpal_budget_resource',
+          ),
+          'callback' => '_node_resource_update',
+          'args' => array(
+            array(
+              'name' => 'budget_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The budget_id of the budget to get.'),
+            ),
+            array(
+              'name' => 'erpal_budget',
+              'optional' => FALSE,
+              'source' => 'data',
+              'description' => t('The erpal_budget data to create.'),
+              'type' => 'array',
+            ),
+          ),
+          'access callback' => '_erpal_budget_resource_access',
+          'access arguments' => array('update'),
+          'access arguments append' => TRUE,
+        ),
+        'delete' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_budget',
+            'name' => 'includes/erpal_budget_resource',
+          ),
+          'callback' => '_erpal_budget_resource_delete',
+          'args' => array(
+            array(
+              'name' => 'budget_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The budget_id of the budget to delete.'),
+            ),
+          ),
+          'access callback' => '_erpal_budget_resource_access',
+          'access arguments' => array('delete'),
+          'access arguments append' => TRUE,
+        ),
+        'index' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_budget',
+            'name' => 'includes/erpal_budget_resource',
+          ),
+          'callback' => '_erpal_budget_resource_index',
+          'args' => array(
+            array(
+              'name' => 'page',
+              'optional' => TRUE,
+              'type' => 'int',
+              'description' => 'The zero-based index of the page to get, defaults to 0.',
+              'default value' => 0,
+              'source' => array('param' => 'page'),
+            ),
+            array(
+              'name' => 'pagesize',
+              'optional' => TRUE,
+              'type' => 'int',
+              'description' => 'Number of records to get per page, defaults to 25.',
+              'default value' => 25,
+              'source' => array('param' => 'pagesize'),
+            ),
+          ),
+          'access callback' => '_erpal_budget_resource_access',
+          'access arguments' => array('view'),
+        ),
+      ),
+    ),
+  );
+
+  return $resources;
+}
+
+/**
+ * Helper to check uuid fields existence.
+ */
+function _erpal_budget_check_uuid() {
+  $schema_changed = FALSE;
+  module_load_include('install', 'uuid', 'uuid');
+  $field = uuid_schema_field_definition();
+  if (!db_field_exists('erpal_budget', 'uuid')) {
+    db_add_field('erpal_budget', 'uuid', $field);
+    db_add_index('erpal_budget', 'uuid', array('uuid'));
+    $schema_changed = TRUE;
+  }
+  if (!db_field_exists('erpal_budget_revision', 'vuuid')) {
+    db_add_field('erpal_budget_revision', 'vuuid', $field);
+    db_add_index('erpal_budget_revision', 'vuuid', array('vuuid'));
+    $schema_changed = TRUE;
+  }
+  if ($schema_changed) {
+    drupal_get_schema(NULL, TRUE);
+  }
+}
+
+/**
+ * Implements hook_uuid_sync().
+ */
+function erpal_budget_uuid_sync() {
+  _erpal_budget_check_uuid();
+}

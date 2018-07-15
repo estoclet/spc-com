@@ -1,0 +1,2 @@
+- implement access function in erpal_core
+- create erpal pricing module, depend on commerce and add a entity reference to pricing entities to output entities

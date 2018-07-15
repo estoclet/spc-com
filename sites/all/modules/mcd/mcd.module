@@ -1,0 +1,293 @@
+<?php
+
+/**
+ * @file
+ * mcd.module
+ *
+ * This module provides the maintenance page with nice countdown timer.
+ * So now you may set time for your maintenance work and your visitors
+ * will see when time is up.
+ *
+ */
+
+/**
+ * Implements hook_help().
+ *
+ * $lang = (array) $GLOBALS['language'];
+  echo "Lang prefix is: " . $lang['prefix'];
+ */
+function mcd_help($path, $arg) {
+//   Care about lang prefix
+    $lang = (array) $GLOBALS['language'];
+    if ($lang['prefix']) {
+        $base_url = $GLOBALS['base_url'] . '/' . $lang['prefix'];
+    } else {
+        $base_url = $GLOBALS['base_url'];
+    }
+//   Help starts here
+    $output = '';
+    switch ($path) {
+        case "admin/help#mcd":
+            $output .= '<h3>' . t('Setting up MCD') . '</h3>';
+            $output .= '<p>' . t('After enabling MCD module goto !url page,
+          set time for maintenance and switch site off. Choose other additional options.
+          After you done your maintenance works, go back and turn your site on-line.', array(
+                        '!url' => l(t('Maintenance mode'), $base_url . '/admin/config/development/maintenance'),
+                    )) . '</p>';
+            $output .= '<h3>' . t('Simplenews integration') . '</h3>';
+            $output .= '<p>' . t('If you want enable visitors to subscribe on your
+          news by email (only email), install !simplenews module.', array(
+                        '!simplenews' => l('Simplenews', 'http://drupal.org/project/simplenews')
+                    )) . '</p>';
+            $output .= '<p>' . t('NOTE: While site is off your subscribers will able read your new by email ONLY.') . '</p>';
+            $output .= '<p>' . t("After you enable Simplenews module, you need to create your website launch category or use default one. Edit:
+          <ul>
+          	<li><strong>Select:</strong> @method → @method_select (because this
+          method don't require confirmation email pages which will be never shown while your site is off-line)</li>
+            <li><strong>Check:</strong> @subsblock (that's all about it)</li>
+          </ul></p><p>
+          Then, go to maintenance page and select subscription form category, to
+          be shown. Switch website offline.", array(
+                        '@method' => t('Opt-in/out method'),
+                        '@method_select' => t('Single'),
+                        '@subsblock' => t('Subscription block'),
+                    )) . '</p>';
+            $output .= '<h4>' . t('Create a newsletter') . '</h4>';
+            $output .= '<p>' . t('After switching the site online, go to "@newsltr"
+          tab of your newsletter node and send the newsletter to your subscribers
+          manually.', array('@newsltr' => t('Newsletter'))) . '</p>';
+            $output .= '<p>' . 'to be continued / продолжение следует / à poursuivre / se continuó / fortgesetzt werden' . '</p>';
+            break;
+    }
+    return $output;
+}
+
+/**
+ * Implements of hook_init().
+ */
+function mcd_init() {
+    if (arg(0) == 'admin' && arg(3) == 'maintenance') {
+        drupal_add_css(drupal_get_path('module', 'mcd') . '/mcd.css', array('type' => 'file', 'every_page' => FALSE, 'preprocess' => FALSE));
+    }
+//    if (variable_get('maintenance_mode', 0) && arg(0) != 'admin') {
+//        drupal_add_css(drupal_get_path('theme', 'jollyness') . '/assets/css/style-preset1.css', array('type' => 'file', 'every_page' => FALSE, 'preprocess' => FALSE));
+//    }
+}
+
+/**
+ * Check if module simplenews is enabled
+ */
+function mcd_check_simplenews() {
+    return module_exists('simplenews');
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function mcd_form_alter(&$form, &$form_state, $form_id) {
+    if ($form_id == 'system_site_maintenance_mode') {
+        $form['mcd'] = array(
+            '#type' => 'fieldset',
+            '#title' => t('Maintenance Countdown settings'),
+            '#weight' => 1,
+            '#collapsible' => TRUE,
+            '#element_validate' => array('mcd_form_validate'),
+        );
+        $form['mcd']['help_info'] = array(
+            '#markup' => '<p>' . t('Here you may set maintenance time. i.e. how long site will be offline. For example, if you plan switch
+            site offline for 5 minutes, enter \'5\' (without apostrophes) in "Minutes" field. If you need 100 hours, just do it — feel
+            free to enter \'100\' (without apostrophes) in "Hours" field.') . '</p>',
+        );
+        $form['mcd']['mcd_months'] = array(
+            '#title' => t('Month(s)'),
+            '#type' => 'textfield',
+            '#size' => 3,
+            '#maxlength' => 3,
+            '#default_value' => variable_get('mcd_months', NULL),
+            '#prefix' => '<div class="mcd">'
+        );
+        $form['mcd']['mcd_days'] = array(
+            '#title' => t('Day(s)'),
+            '#type' => 'textfield',
+            '#size' => 3,
+            '#maxlength' => 3,
+            '#default_value' => variable_get('mcd_days', NULL)
+        );
+        $form['mcd']['mcd_hours'] = array(
+            '#title' => t('Hours(s)'),
+            '#type' => 'textfield',
+            '#size' => 3,
+            '#maxlength' => 3,
+            '#default_value' => variable_get('mcd_hours', NULL)
+        );
+        $form['mcd']['mcd_minutes'] = array(
+            '#title' => t('Minute(s)'),
+            '#type' => 'textfield',
+            '#size' => 3,
+            '#maxlength' => 3,
+            '#default_value' => variable_get('mcd_minutes', NULL)
+        );
+        $form['mcd']['mcd_seconds'] = array(
+            '#title' => t('Seconds'),
+            '#type' => 'textfield',
+            '#size' => 3,
+            '#maxlength' => 3,
+            '#default_value' => variable_get('mcd_seconds', NULL),
+            '#suffix' => '</div>'
+        );
+        $form['mcd']['mcd_time_up_message'] = array(
+            '#title' => t('Message after time is up'),
+            '#type' => 'textarea',
+            '#default_value' => variable_get('mcd_time_up_message', t('Time is up. Please reload this page by hitting <kbd>F5</kbd> on your keyboard or click on "Reload" button below.')),
+            '#description' => t('Write some message that will be shown after time is up. HTML allowed.'),
+        );
+        //  Reload settings
+        $form['mcd']['reload_settings'] = array(
+            '#type' => 'fieldset',
+            '#title' => t('Maintenance page reload settings'),
+            '#collapsible' => TRUE,
+            '#collapsed' => TRUE
+        );
+        $form['mcd']['reload_settings']['mcd_reload_button'] = array(
+            '#type' => 'radios',
+            '#default_value' => variable_get('mcd_reload_button', 0),
+            '#options' => array(
+                t('Show reload button'),
+                t("Don't show reload button"),
+                t("Don't show reload button, but add auto-reloading maintenance page every 15 seconds after time is up")),
+        );
+        //  Page theme setings
+        $form['mcd']['theme_settings'] = array(
+            '#type' => 'fieldset',
+            '#title' => t('Maintenance page customization'),
+            '#collapsible' => TRUE,
+            '#collapsed' => TRUE
+        );
+        $form['mcd']['theme_settings']['mcd_page_themes'] = array(
+            '#type' => 'select',
+            '#title' => t('Select page theme'),
+            '#default_value' => variable_get('mcd_page_themes', 'light'),
+            '#options' => array(
+                'light' => t('Light'),
+                'dark' => t('Dark')
+            )
+        );
+        $form['mcd']['theme_settings']['mcd_site_logo'] = array(
+            '#type' => 'checkbox',
+            '#title' => t('Hide site logo'),
+            '#default_value' => variable_get('mcd_site_logo', 0),
+        );
+        $form['mcd']['theme_settings']['mcd_site_name'] = array(
+            '#type' => 'checkbox',
+            '#title' => t('Hide site name with link'),
+            '#default_value' => variable_get('mcd_site_name', 0),
+        );
+        $form['mcd']['theme_settings']['mcd_site_slogan'] = array(
+            '#type' => 'checkbox',
+            '#title' => t('Hide site slogan'),
+            '#default_value' => variable_get('mcd_site_slogan', 0),
+        );
+        if (mcd_check_simplenews()) {
+            $form['mcd']['emailsubs_settings'] = array(
+                '#type' => 'fieldset',
+                '#title' => t('Subscription form settings'),
+                '#collapsible' => TRUE,
+                '#collapsed' => TRUE,
+            );
+            $form['mcd']['emailsubs_settings']['mcd_email_subscr'] = array(
+                '#type' => 'select',
+                '#title' => t('Select form to be shown on maintenance page'),
+                '#options' => array(t('<none>')) + simplenews_category_list(),
+                '#default_value' => variable_get('mcd_email_subscr', 0),
+            );
+            $form['mcd']['emailsubs_settings']['mcd_email_place'] = array(
+                '#description' => t('If you want some placeholder for email field, so type it here.'),
+                '#type' => 'textfield',
+                '#title' => t('Placeholder for email field'),
+                '#default_value' => variable_get('mcd_email_place'),
+            );
+        }
+        $form['#submit'][] = 'mcd_submit';
+    }
+    if ($form_id == 'simplenews_block_form_' . variable_get('mcd_email_subscr') && variable_get('mcd_email_place')) {
+        $form['mail']['#attributes'] = array('placeholder' => variable_get('mcd_email_place'));
+    }
+}
+
+/**
+ * Validation handler for time fields. All fields must be numeric
+ */
+function mcd_form_validate($form, &$form_state) {
+    foreach (array('mcd_months', 'mcd_days', 'mcd_hours', 'mcd_minutes', 'mcd_seconds') as $field) {
+        // check if fields are numeric
+        if (!empty($form_state['values'][$field])) {
+            if (!is_numeric($form_state['values'][$field])) {
+                form_set_error($field, t('Time must be entered as number, check field(s).'));
+            }
+        }
+        // fill '0' in empty fields to prevent incorrect time set
+        else {
+            $form_state['values'][$field] = 0;
+        }
+    }
+}
+
+/**
+ * Add system_site_maintenance_settings form submit processing.
+ */
+function mcd_submit($form, &$form_state) {
+// If website offline
+    if (variable_get('maintenance_mode', 0) == 1) {
+//  get time like 1315776380
+        $starttime = REQUEST_TIME;
+        $offtime = array(
+            variable_get('mcd_months', 0) . ' months',
+            variable_get('mcd_days', 0) . ' days',
+            variable_get('mcd_hours', 0) . ' hours',
+            variable_get('mcd_minutes', 0) . ' minutes',
+            variable_get('mcd_seconds', 0) . ' seconds'
+        );
+        $stoptime = strtotime(format_date($starttime, 'custom', 'c') . " +" . implode(" ", $offtime));
+//  save stop-time in var, output like 1315776380
+        variable_set('mcd_stoptime', $stoptime);
+
+//  for messages
+        $start = format_date($starttime, 'small');
+        $stop = format_date($stoptime, 'small');
+        watchdog('mcd', 'Maintenance time @start — @stop', array('@start' => $start, '@stop' => $stop), WATCHDOG_INFO);
+
+        if ($starttime == $stoptime) {
+            variable_set('mcd_maintenance', 0);
+            drupal_set_message(t('The timer is not set, because the time is not given.'), 'warning');
+        }
+//  process
+        else {
+            variable_set('mcd_maintenance', 1);
+            drupal_set_message(t('Maintenance time @start — @stop', array('@start' => $start, '@stop' => $stop)));
+        }
+    }
+//  If website online
+    else {
+        variable_set('mcd_maintenance', 0);
+        drupal_set_message(t('Site on-line.'));
+        watchdog('mcd', 'Site on-line', NULL, WATCHDOG_INFO);
+    }
+
+    // Update the registry based on the latest files listed in the DB.
+    registry_rebuild();
+    system_rebuild_theme_data();
+    drupal_theme_rebuild();
+
+    // If cache lifetime has been set, then clear page cache
+    if (variable_get('cache_lifetime', 0) > 0) {
+        cache_clear_all('*', 'cache', TRUE);
+        cache_clear_all('*', 'cache_page', TRUE);
+    }
+}
+
+/**
+ * If time is set process our maintenance page with countdown
+ */
+if (variable_get('mcd_maintenance', 0) == '1') {
+    include_once 'mcd.countdown.inc';
+}

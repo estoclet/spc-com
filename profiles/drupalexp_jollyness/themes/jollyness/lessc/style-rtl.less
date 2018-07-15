@@ -1,0 +1,65 @@
+/*
+This file is used to fix style for RTL case.
+*/
+/* 
+    Created on : Jun 8, 2014, 9:46:29 PM
+    Author     : DrupalEXP
+*/
+
+body.rtl{
+
+    /*List style in RTL 
+    ============================================*/
+    /*Accordion*/
+    .panel-group{
+        .panel-title:after{
+            float: left;
+        }
+    }
+    /*simister*/
+    .ImageWrapper .StyleSc span:nth-of-type(2){
+        right: auto;
+    }
+    /*menu*/
+    .menu ul li a, .menu ul li span{
+        text-align: right;
+    }
+
+    .dexp-dropdown > ul ul ul {
+        left: -200px;
+        width:200px;
+    }
+    /*twitter*/
+    .boder-icon{
+        .dexp-twitter{
+            .sp-text {
+                padding-right: 50px;
+                padding-left: 0;
+                text-align: right;
+                &:before{
+                    left: auto;
+                    right: 0;
+                }
+            }
+            .author{
+               padding-left: 0;
+               padding-right: 50px;
+               text-align: right;
+            }
+        }
+    }
+    /*Box*/
+    .dexp-shortcodes-box.box-top .box-icon{
+        float: right;
+        margin: 3px 0px 10px 15px;
+    }
+    .dexp-shortcodes-box.box-top h3{
+        text-align: right;
+    }
+    .blog_wrap .post_date{
+        float: right;
+        margin-right: 0;
+        margin-left: 10px;
+    }
+    .region-social-top ul{float: right; margin:0}
+}

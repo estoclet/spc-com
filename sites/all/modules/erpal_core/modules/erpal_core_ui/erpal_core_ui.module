@@ -1,0 +1,166 @@
+<?php
+
+/**
+ * @file
+ * Provides the UI for ERPAL Core.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function erpal_core_ui_menu() {
+  $items = array();
+  $items['admin/erpal'] = array(
+    'title' => 'ERPAL',
+    'description' => 'ERPAL modules and features settings.',
+    'position' => 'right',
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+    'weight' => 20,
+  );
+  $items['admin/erpal/add-content'] = array(
+    'title' => 'ERPAL Add content',
+    'description' => 'Add ERPAL content.',
+    'position' => 'right',
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+    'weight' => -10,
+  );
+  $items['admin/erpal/content'] = array(
+    'title' => 'ERPAL Content',
+    'description' => 'ERPAL content.',
+    'position' => 'right',
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+    'weight' => -10,
+  );
+  $items['admin/erpal/settings'] = array(
+    'title' => 'ERPAL Settings',
+    'description' => 'Configure the appearance of ERPAL.',
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+    'weight' => 20,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function erpal_core_ui_permission() {
+  return array(
+    'view erpal dashboard' => array(
+      'title' => t('View ERPAL dashboard'),
+      'description' => t('Use dashboard.'),
+    ),
+    'administer erpal settings' => array(
+      'title' => t('Administer ERPAL Settings'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Implements hook_theme().
+ */
+function erpal_core_ui_theme() {
+  return array(
+    'erpal_core_ui_ctools_dropbutton' => array(
+      'variables' => array(
+        'ops_count' => NULL,
+        'links' => array(),
+        'index' => NULL,
+      ),
+    ),
+    'erpal_core_ui_add_list' => array(
+      'variables' => array('content' => array()),
+      'file' => 'theme/erpal_core_ui.theme.inc',
+    ),
+  );
+}
+
+/**
+ * Implements hook_admin_paths().
+ */
+function erpal_core_ui_admin_paths() {
+  $paths = array(
+    'erpal/admin' => TRUE,
+    'erpal/admin/*' => TRUE,
+  );
+
+  return $paths;
+}
+
+/**
+ * Additional function that adds special CSS/JS files for dropbuttons.
+ */
+function erpal_core_ui_ctools_add_dropbutton_files() {
+  // Add needed files.
+  ctools_add_js('dropbutton');
+  ctools_add_css('dropbutton');
+  ctools_add_css('button');
+
+  // Add views & seven files.
+  views_add_css('views-admin');
+  views_add_css('views-admin.ctools');
+  views_add_css('views-admin.seven');
+}
+
+/**
+ * Theme function for operation links.
+ */
+function theme_erpal_core_ui_ctools_dropbutton($variables) {
+  $output = '';
+
+  $ops_count = $variables['ops_count'];
+  $links = $variables['links'];
+  $index = $variables['index'];
+
+  if (is_array($links) && count($links)) {
+    $item_list = array();
+    for ($i = count($links) - $ops_count; $i < count($links); $i++) {
+      $item_list['items'][] = $links[$i];
+    }
+
+    $class = 'ctools-no-js ctools-dropbutton ctools-button';
+    $output .= '<div class="' . $class . '" id="ctools-button-' . $index . '">';
+    $output .= '<div class="ctools-link">';
+    $output .= '<a href="#" class="ctools-twisty ctools-text">' . t('open') . '</a>';
+    $output .= '</div>';
+    $output .= '<div class="ctools-content">';
+    $output .= theme('item_list', $item_list);
+    $output .= '</div>';
+    $output .= '</div>';
+  }
+
+  return $output;
+}
+
+/**
+ * Helper function to remove links by path from specified menu.
+ *
+ * @param array $conditions
+ *   Assoc array keyed by menu name. Each entry is array of paths,
+ *   link to which should be removed.
+ */
+function erpal_core_ui_remove_links($conditions) {
+  foreach ($conditions as $menu_name => $links_path) {
+    $links = menu_load_links($menu_name);
+    foreach ($links as $link) {
+      foreach ($links_path as $link_path) {
+        if ($link['link_path'] == $link_path) {
+          menu_link_delete($link['mlid']);
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+<?php
+
+/**
+ * @file
+ * Provides main file with hook definitions for the module.
+ */
+
+/**
+ * Implements hook_form_alter().
+ */
+function erpal_quote_commerce_cart_form_alter(&$form, &$form_state, $form_id) {
+  if (strpos($form_id, 'views_form_commerce_cart_form_') === 0) {
+    // Only alter buttons if the cart form View shows line items.
+    $view = reset($form_state['build_info']['args']);
+
+    if (!empty($view->result)) {
+      $form['actions']['erpal_quote_download'] = array(
+        '#type' => 'submit',
+        '#value' => t('Download quote'),
+        '#submit' => array('erpal_quote_commerce_cart_form_download_quote'),
+      );
+    }
+  }
+}
+
+/**
+ * Submit callback for "Donwload quote" button in commerce cart.
+ */
+function erpal_quote_commerce_cart_form_download_quote($form, &$form_state) {
+  if (empty($form_state['order'])) {
+    return;
+  }
+
+  // Execute proper rules event.
+  rules_invoke_event('erpal_quote_commerce_cart_get_quote', $form_state['order']);
+}

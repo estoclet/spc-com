@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Drupalexp Jollyness feature.
+ */
+
+include_once 'dexp_jollyness.features.inc';

@@ -1,0 +1,13 @@
+@CHARSET "UTF-8";
+
+.mcd {
+	clear: both;
+	display: inline-block;
+	float: none;
+}
+.mcd .form-item,
+#edit-mcd-page-themes-wrapper label	 {
+	float:left;
+	margin-right:1em;
+}
+.mcd #edit-seconds-wrapper {margin-right:0}

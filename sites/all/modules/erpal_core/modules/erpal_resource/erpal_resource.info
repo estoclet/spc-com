@@ -1,0 +1,34 @@
+name = ERPAL Resource
+description = Provides an entity for resources.
+package = ERPAL Core
+core = 7.x
+
+; =======================
+; Dependencies
+; =======================
+
+dependencies[] = erpal_core
+dependencies[] = entityreference
+dependencies[] = date_api
+dependencies[] = date
+dependencies[] = date_popup
+dependencies[] = date_views
+dependencies[] = rules
+
+; =======================
+; Module Files
+; =======================
+
+; Module includes.
+files[] = includes/erpal_resource.controller.inc
+files[] = includes/erpal_resource.inline_entity_form.inc
+
+; Views handlers.
+files[] = views/handlers/erpal_resource_handler_field_links.inc
+
+; Information added by Drupal.org packaging script on 2016-09-29
+version = "7.x-3.0-alpha1+42-dev"
+core = "7.x"
+project = "erpal_core"
+datestamp = "1475156341"
+

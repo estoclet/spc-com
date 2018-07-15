@@ -1,0 +1,395 @@
+body[class*=preset-dark]{
+    #comments_wrapper {
+        #comment-form {
+            .form-text,.form-textarea {
+                background-color: #363636;
+                border-color: #222222;
+            }
+        }
+    }
+    color: #D3D3D3;
+    background-color: #292929 !important;
+    hr{
+        color: #545454;
+    }
+    .bordertop{
+        border-top: 1px solid #545454;
+    }
+    /*================HEADER====================*/
+    #section-header {
+        .dexp-menu
+        {
+            ul.menu
+            {
+                li{
+                    a, span.nolink{
+                        color: #D3D3D3 !important;
+                        &:hover, &.active{
+                            color: @base_color !important;
+                        }
+                    }
+                    ul.menu{
+                        >li:not(.last){
+                            border-bottom: 1px solid #404040;
+                        }
+                        background-color: #292929;
+                        border: solid 1px #292929;
+                        li{
+                            a, span{
+                                color: #D3D3D3 !important;
+                            }
+                        }
+                    }
+                }
+
+            }
+        }
+    }
+    .dexp-dropdown {
+      ul.menu{
+        .dexp-menu-row{
+          background: #292929;
+        }
+      }
+      .menu-attach-block-wrapper{ 
+        background: #292929;
+        &.orientation-horizontal .block {
+          background-color: transparent;
+        }
+      }
+    }
+
+    /*================END=======================*/
+
+    section.dexp-section{
+        background-color: #292929;
+    }
+    #section-top{
+        border-bottom: 1px solid #2F2F2F;
+    }
+    #section-header{
+        background-color: #323232;
+        border-bottom: 1px solid #2F2F2F;
+        .search-wrapper{
+            background-color: #323232;
+        }
+    }
+    &.boxed{
+        background: url("../images/boxed_dark_bg.png");
+        .dexp-body-inner{
+            box-shadow:0 0 10px rgba(0, 0, 0, 0.25);
+        }
+    }
+    .bigtitle .block-subtitle {
+        color: #FFFFFF;
+    }
+    .dexp-shortcodes-box.box-circle:not(.parallax) .box-icon {
+        background-color: transparent;
+    }
+    .pricing_details .pricing-box{
+        .jtbtn{
+            border-color: @base_color;
+            color: #FFFFFF !important;      
+        }
+        &:hover .jtbtn{
+            background-color: #343434;
+            border-color: #343434;
+        }
+        &:hover .price{
+            background-color: #343434;
+        }
+    } 
+
+    /*=================ACCORDION==================*/
+    .panel-group{
+        .panel{            
+            border-radius: 0;
+            .panel-heading {
+                background-color: #292929;
+                border: 1px solid #545454;
+                border-radius: 3px; 
+
+                .panel-title {
+                    &:after{
+                        color: #FFF; 
+                    }
+                    a{
+                        color: #FFF;                    
+                    }
+                }
+                &:hover{
+                    border-color: @base_color;
+                    .panel-title:after, a{
+                        color: @base_color;
+                    }
+                }
+            }
+            .panel-body{
+                border: none !important;
+            }
+        }
+
+    }
+
+    /*============SKILL BAR================*/
+    .skill-bar{
+        .skill-bar-title{
+            color: #FFF;
+        }
+    }
+
+    /*===============BLOG====================*/
+    .blog_wrap{
+        .title{
+            .post_date{
+                border-color: #fff;
+            }
+            .post_date, h3 a, i{
+                color: #fff;
+            }
+        }
+    }
+
+    /*==============FORM====================*/
+    .contact-form, form {
+        .form-text, .form-textarea, .form-checkbox{
+            background-color: #363636;
+            border: solid 1px #222222;
+            color: #656565;
+        }
+    }
+    .form-control{
+        background-color: #363636;
+        border: solid 1px #222222;
+        color: #656565;
+    }
+    .box-hexagon{
+        strong{
+            color: #fff;
+        }
+    }
+
+    /*==================FOOTER=================*/
+    .copyright{
+        color: #fff;
+    }
+
+    /*==================TAB====================*/
+    .nav-tabs 
+    {
+        border-bottom: 1px solid #454545;
+        li{
+            a {
+                border: 1px solid #454545;  
+                border-right:none;
+                &:hover{
+                    color: #FFF; 
+                    border: 1px solid #454545;  
+                }
+            } 
+            &.active{
+                a{
+                    color: #656565; 
+                    background-color: transparent;                    
+                    border: 1px solid #454545; 
+                    border-right:none;
+                }                
+            }
+        }
+        li:first-child{
+            border-left: none;
+        }
+        li:last-child{
+            border-right: 1px solid #454545;  
+        }
+    }
+    .tab-content 
+    {
+        background: none !important;
+        border-bottom: none !important;
+        border-left: none !important;
+        border-right: none !important;
+        padding:0 !important;
+        .tab-pane{
+            background: none repeat scroll 0 0 #343434;
+            border-bottom: 1px solid #454545;
+            border-left: 1px solid #454545;
+            border-right: 1px solid #454545;
+            padding: 20px;
+        }
+    }
+    .dexp_tab_wrapper{
+        &.vertical{      
+            background: url("../images/dark-fc.png") repeat-y scroll 0 0 rgba(0, 0, 0, 0) !important;
+            border: 1px solid #454545 !important;
+            padding-bottom: 0px !important;
+            li{
+                a{
+                    border-bottom: 1px solid #454545;
+                    border-left: none !important;
+                    border-right: none !important;
+                    border-top:  none !important;                    
+                }
+                &.active{
+                    a{
+                        border-bottom: 1px solid #454545 !important;
+                    }
+                }
+                &.last.active{
+                    a{
+                        border-bottom-color: #454545 !important;
+                    }
+                }
+            }            
+            .tab-pane{
+                border: none !important;
+            }
+        }
+    }
+
+    /*=================CLIENT FEEDBACK=================*/
+    .rating-block, .greybg .rating-block {
+        border-color: #2F2F2F !important;
+        background:transparent !important;
+        p{
+            color: #D3D3D3;
+        }
+    }
+    .rating-block:hover {
+        background-color: @base_color !important;
+        p, a, span{
+            color: #fff !important;
+        }
+    }
+
+    /*==================BOX============================*/
+    .box-custom{
+        .serviceicon{
+            background-color: #343434;
+            border-color: #545454;
+        }
+        &:hover .serviceicon{
+            //background-color: @base_color;
+        }
+    }
+
+    /*====================BLOG=========================*/
+    .blog-columns {
+        background: none repeat scroll 0 0 #292929;
+        border: 1px solid #545454;
+        .blog-content 
+        {
+            h3 {
+                border-bottom: 1px solid #545454;
+                a{             
+                    color: #FFFFFF !important;
+                } 
+            }
+            i {
+                color: #FFFFFF !important;
+            }  
+        }
+    }
+    .comment-wrapper{
+        .comment-content { 
+            background: none repeat scroll 0 0 #292929 !important;
+            border: 1px solid #545454 !important;
+        }
+        .comment-avatar img{
+            padding: 0 !important;
+            background-color: transparent !important;
+            border-color: transparent !important;
+        }
+    }
+
+    /*==================PRODUCT===================*/
+    .product_title a{
+        color: #fff !important;
+    }
+
+    /*===================SOCIAL==================*/
+    .social li, .callus li {
+        border-left: 1px solid #2F2F2F;
+        &:last-child {
+            border-right: 1px solid #2F2F2F;
+        }
+    }
+
+    /*===================FORUM====================*/
+        #section-main-content{
+            background-color: #292929 !important;
+        }
+    
+    .forum-table {
+        background: transparent !important;
+        th{
+            color: #FFFFFF !important;
+            border: 1px solid #545454  !important;
+            a{
+                color: #FFFFFF !important;
+            }
+        }
+        tr{
+            border: 1px solid  #545454  !important;
+            td{
+                border: 1px solid  #545454  !important;
+            }
+        }        
+    }
+
+    .forum-table-name{
+        color: #FFFFFF !important;
+    }
+    .forum-table-superheader {
+        background: transparent !important;
+        border: 1px solid #545454 !important;
+    }
+    #commerce-checkout-form-checkout {
+        legend {
+            span,a {
+                color: #FFF ;
+                &:hover {
+                    color: @base_color;
+                }
+            }
+        }
+    }
+    #section-copyright {
+        background: #292723 !important;
+        color: #FFF;
+        a {
+            color: #FFF;
+            &.active-trail,&:hover{
+                color: @base_color;
+            }
+        }
+    }
+    h3.portfolio-title{
+        a{color: #FFF;}
+    }
+
+    .forum-post-info,.forum-post-wrapper, .forum-post-panel-main, .forum-post, .forum-post-title, .forum-post-footer{
+        background: transparent !important;
+        border-color: #545454 !important;
+    }
+    .forum-post-info{
+        border-top:none;
+        a, .forum-posted-on, span{
+            color:#fff !important;
+        }
+    }
+    
+    #forum-statistics-header, #forum-statistics-active-body, #forum-statistics-statistics-body{
+        background: transparent !important;
+        border-top: none;
+        color: #FFF;
+    }
+}
+body[class*=preset-white]{
+    #section-header{
+        background-color: #FFF;
+        .search-wrapper{
+            background-color: #FFF;
+        }
+    }
+}

@@ -1,0 +1,36 @@
+name = ERPAL Budget
+description = Provides an entity for budget
+package = ERPAL Core
+core = 7.x
+
+; =======================
+; Dependencies
+; =======================
+
+; Core dependencies
+dependencies[] = erpal_core
+dependencies[] = erpal_resource
+dependencies[] = rules
+
+; Field dependencies
+dependencies[] = mvf
+dependencies[] = entityreference
+dependencies[] = list
+
+; =======================
+; Module Files
+; =======================
+
+; Module includes
+files[] = includes/erpal_budget.controller.inc
+files[] = includes/erpal_budget.inline_entity_form.inc
+
+; Views handlers
+files[] = views/handlers/erpal_budget_handler_field_links.inc
+
+; Information added by Drupal.org packaging script on 2016-09-29
+version = "7.x-3.0-alpha1+42-dev"
+core = "7.x"
+project = "erpal_core"
+datestamp = "1475156341"
+

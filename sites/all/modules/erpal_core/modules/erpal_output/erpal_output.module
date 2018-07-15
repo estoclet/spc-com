@@ -1,0 +1,310 @@
+<?php
+
+/**
+ * @file
+ * Main module's file.
+ */
+
+/**
+ * Path to Date item types admin page.
+ */
+define('ERPAL_OUTPUT_ADMIN_PATH', 'admin/erpal/output-types');
+
+/**
+ * Include module files.
+ */
+erpal_output_include('property');
+erpal_output_include('erpal_output.api');
+erpal_output_include('erpal_output_type.api');
+erpal_output_include('budget_field_info');
+erpal_output_include('theme');
+
+/**
+ * Implements hook_entity_info().
+ */
+function erpal_output_entity_info() {
+
+  // Describes date item entity.
+  $return = _erpal_output_entity_info();
+
+  // Describes date item type entity.
+  $return += _erpal_output_type_entity_info();
+
+  return $return;
+}
+
+/**
+ * Implements hook_entity_info_alter().
+ */
+function erpal_output_entity_info_alter(&$entity_info) {
+
+  // Attach bundles to the date item entity.
+  _erpal_output_entity_info_alter($entity_info);
+}
+
+/**
+ * Implements hook_permission().
+ */
+function erpal_output_permission() {
+  $permissions = array(
+    'administer output types' => array(
+      'title' => t('Administer output types'),
+      'description' => t('Allows users to configure output types and their fields.'),
+      'restrict access' => TRUE,
+    ),
+  );
+
+  $permissions += erpal_core_entity_access_permissions('erpal_output');
+
+  return $permissions;
+}
+
+/**
+ * Implements hook_output_resource_find().
+ *
+ * Find resource in assigned budget and attach it to the given output.
+ */
+function erpal_output_output_resource_find($output) {
+  $output_wrapper = entity_metadata_wrapper('erpal_output', $output);
+  $resource_id = $output_wrapper->field_resource->raw();
+
+  $budgets = $output_wrapper->field_output_budget->value();
+  if (!empty($budgets)) {
+    $budgets = !empty($budgets[0]) ? $output_wrapper->field_output_budget : array($output_wrapper->field_output_budget);
+
+    if (empty($resource_id) && !empty($budgets[0])) {
+
+      $budget_wrapper = $budgets[0]->budget;
+      $output_wrapper->field_resource = $budget_wrapper->field_resource->raw();
+    }
+  }
+}
+
+/**
+ * Implements hook_forms().
+ *
+ * Create form for adding/editing erpal_output.
+ * Their id is like 'erpal_output_edit_' . $bundle . '_form'.
+ *
+ * @see entity_ui_get_form()
+ */
+function erpal_output_forms($form_id, $args) {
+  $forms = array();
+
+  // Check whether it is erpal_output form.
+  if (strpos($form_id, 'erpal_output_edit_') === 0) {
+    $forms[$form_id] = array(
+      'callback' => 'erpal_output_form',
+    );
+  }
+
+  return $forms;
+}
+
+/**
+ * Implements hook_feeds_plugins().
+ */
+function erpal_output_feeds_plugins() {
+  $info['ERPALFeedsOutputProcessor'] = array(
+    'name' => 'ERPAL output processor',
+    'description' => 'Create and update ERPAL outputs.',
+    'help' => 'Create and update ERPAL outputs from parsed content.',
+    'handler' => array(
+      'parent' => 'FeedsProcessor',
+      'class' => 'ERPALFeedsOutputProcessor',
+      'file' => 'ERPALFeedsOutputProcessor.inc',
+      'path' => drupal_get_path('module', 'erpal_output') . '/includes',
+    ),
+  );
+  return $info;
+}
+
+/**
+ * Implements hook_uuid_sync().
+ */
+function erpal_output_uuid_sync() {
+  _erpal_output_check_uuid();
+}
+
+/**
+ * Helper to check uuid fields existence.
+ */
+function _erpal_output_check_uuid() {
+  $schema_changed = FALSE;
+  module_load_include('install', 'uuid', 'uuid');
+  $field = uuid_schema_field_definition();
+  if (!db_field_exists('erpal_output', 'uuid')) {
+    db_add_field('erpal_output', 'uuid', $field);
+    db_add_index('erpal_output', 'uuid', array('uuid'));
+    $schema_changed = TRUE;
+  }
+  if (!db_field_exists('erpal_output_revision', 'vuuid')) {
+    db_add_field('erpal_output_revision', 'vuuid', $field);
+    db_add_index('erpal_output_revision', 'vuuid', array('vuuid'));
+    $schema_changed = TRUE;
+  }
+  if ($schema_changed) {
+    drupal_get_schema(NULL, TRUE);
+  }
+}
+
+/**
+ * Implements hook_services_resources().
+ */
+function erpal_output_services_resources() {
+  // @todo Check access to resources.
+  $resources = array(
+    '#api_version' => 3002,
+    'erpal_output' => array(
+      'operations' => array(
+        'retrieve' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_output',
+            'name' => 'includes/resource',
+          ),
+          'callback' => 'erpal_output_load',
+          'args' => array(
+            array(
+              'name' => 'output_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The output_id of the output to get.'),
+            ),
+          ),
+          'access callback' => '_erpal_output_resource_access',
+          'access arguments' => array('view'),
+          'access arguments append' => TRUE,
+        ),
+        'create' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_output',
+            'name' => 'includes/resource',
+          ),
+          'callback' => '_erpal_output_resource_create',
+          'args' => array(
+            array(
+              'name' => 'erpal_output',
+              'optional' => FALSE,
+              'source' => 'data',
+              'description' => t('The erpal_output data to create.'),
+              'type' => 'array',
+            ),
+          ),
+          'access callback' => '_erpal_output_resource_access',
+          'access arguments' => array('create'),
+          'access arguments append' => TRUE,
+        ),
+        'update' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_output',
+            'name' => 'includes/resource',
+          ),
+          'callback' => '_node_resource_update',
+          'args' => array(
+            array(
+              'name' => 'output_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The output_id of the output to get.'),
+            ),
+            array(
+              'name' => 'erpal_output',
+              'optional' => FALSE,
+              'source' => 'data',
+              'description' => t('The erpal_output data to create.'),
+              'type' => 'array',
+            ),
+          ),
+          'access callback' => '_erpal_output_resource_access',
+          'access arguments' => array('update'),
+          'access arguments append' => TRUE,
+        ),
+        'delete' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_output',
+            'name' => 'includes/resource',
+          ),
+          'callback' => '_erpal_output_resource_delete',
+          'args' => array(
+            array(
+              'name' => 'output_id',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => t('The output_id of the output to delete.'),
+            ),
+          ),
+          'access callback' => '_erpal_output_resource_access',
+          'access arguments' => array('delete'),
+          'access arguments append' => TRUE,
+        ),
+        'index' => array(
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'erpal_output',
+            'name' => 'includes/resource',
+          ),
+          'callback' => '_erpal_output_resource_index',
+          'args' => array(
+            array(
+              'name' => 'page',
+              'optional' => TRUE,
+              'type' => 'int',
+              'description' => 'The zero-based index of the page to get, defaults to 0.',
+              'default value' => 0,
+              'source' => array('param' => 'page'),
+            ),
+            array(
+              'name' => 'pagesize',
+              'optional' => TRUE,
+              'type' => 'int',
+              'description' => 'Number of records to get per page, defaults to 25.',
+              'default value' => 25,
+              'source' => array('param' => 'pagesize'),
+            ),
+          ),
+          'access callback' => '_erpal_output_resource_access',
+          'access arguments' => array('view'),
+        ),
+      ),
+    ),
+  );
+
+  return $resources;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function erpal_output_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'erpal_output') . '/views',
+  );
+}
+
+/**
+ * Wrapper for loading .inc files.
+ *
+ * This function is helpful for including .inc files. The
+ * general case is including functionality like this:
+ *
+ * @code
+ * erpal_output_include('admin');
+ * @endcode
+ *
+ * @param $filename
+ *   The base file name to be included.
+ *
+ * @param $folder
+ *   (Optional) The folder where file is stored.
+ */
+function erpal_output_include($filename, $folder = 'includes') {
+  module_load_include('inc', 'erpal_output', $folder . '/' . $filename);
+}

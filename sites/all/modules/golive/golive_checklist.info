@@ -1,0 +1,13 @@
+name = GOLIVE Checklist
+description = A checklist for taking a Drupal site live.
+core = 7.x
+dependencies[] = checklistapi
+package = GOLIVE
+configure = admin/config/search/golive-checklist
+
+; Information added by Drupal.org packaging script on 2016-02-09
+version = "7.x-1.0-alpha2"
+core = "7.x"
+project = "golive"
+datestamp = "1455011056"
+

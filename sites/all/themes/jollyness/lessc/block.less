@@ -1,0 +1,160 @@
+/*	################################################################
+	BLOCK SIDE BAR
+################################################################# */
+.region-left-sidebar, .region-right-sidebar  {
+  .block {
+    margin-bottom:20px;
+    padding-bottom:20px;
+  }
+}
+.block .blog_wrap{
+    margin-top: 0;
+}
+
+/*	################################################################
+	BLOCK TITLE STYLES
+################################################################# */
+.title {
+    h1.block-title {
+      font-size:30px;
+    }
+    > hr {
+        border-top: 1px solid #D4D4D4;
+        margin: 0 auto;
+        max-width: 235px;
+        position: relative;
+        &:after {
+            border-top: 1px solid @base_color;
+            content: "";
+            left: 30%;
+            position: absolute;
+            right: 30%;
+            top: -1px;
+        }
+    }
+    .block-subtitle,.lead {
+        font-family: 'Droid Serif',Georgia,"Times New Roman",serif !important;
+        font-size: 15px;
+        font-style: italic;
+        font-weight: 300;
+        line-height: 1;
+        padding: 15px 0;
+    }
+    .block-subtitle{
+        padding-bottom: 50px;
+    }
+}
+
+.title1 {
+	> hr {
+		border-top: 1px solid #D4D4D4;
+		margin: 0;
+		max-width: 280px;
+		position: relative;
+		&:after {
+			border-top: 1px solid @base_color;
+			content: "";
+			left: 0;
+			position: absolute;
+			right: 80%;
+			top: -1px;
+		}
+	}
+    .lead {
+        font-family: 'Droid Serif',Georgia,"Times New Roman",serif !important;
+        font-size: 15px;
+        font-style: italic;
+        font-weight: 300;
+        line-height: 1;
+        padding: 15px 0;
+    }
+}
+
+.bigtitle{
+  padding: 20px 0;
+  > .content {
+    padding-top:20px;
+  }
+  h1.block-title{
+    border-bottom: 1px solid #D4D4D4;
+    font-family: 'NovecentowideBookBold','Helvetica Neue',Helvetica,sans-serif;
+    font-size: 51px;
+    font-weight: normal;
+    padding-bottom: 30px;
+    position: relative;
+    &:after{
+      border-bottom: 1px solid @base_color;
+      bottom: -1px;
+      content: "";
+      height: 0;
+      left: 0;
+      position: absolute;
+      width: 25%;
+    }
+  }
+  .block-subtitle{
+    color: #292723;
+    font-size: 21px;
+    font-weight: 300;
+    line-height: 1.6;
+    padding: 0 0 0 50px;
+    margin-top: 20px;
+    span {
+       color: @base_color;
+    }
+  }
+}
+/*	################################################################
+	BLOCK - Elements in Block
+################################################################# */
+.block {
+  h3 {
+    font-size:18px;
+  }
+  &.white {
+    h1, .title h3 {
+      color: #FFF;
+    }
+    .block-subtitle {
+      color: #FFF;
+    }
+  }
+}
+/*	################################################################
+	PARALLAX BLOCK 
+################################################################# */
+.block.overlay{
+  position: relative;
+  .inner{
+    background: url("../images/gridtile.png")  rgba(0, 0, 0, 0.4);
+    content:"";
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    left: 0;
+    top:0;
+    z-index:0;
+  }
+  .content{
+    z-index:1;
+    position: relative;
+  }
+}
+.dexp-parallax {
+  h1,h2,h3,h4,h5,h6 {
+    color: #FFFFFF !important;
+  }
+  .rating-block  {
+    background:none;
+  }
+  &.overlay {
+    h1.block-title {
+        padding-top:60px;
+        color: #FFFFFF !important;
+    }
+  }
+}
+
+.greybg .rating-block {
+  background: #F6F6F6 !important;
+}

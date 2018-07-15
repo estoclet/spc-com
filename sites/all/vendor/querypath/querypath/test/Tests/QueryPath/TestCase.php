@@ -1,0 +1,22 @@
+<?php /*457563643457563643*/ ?><?php  ?><?php  ?><?php
+/**
+ * @file
+ *
+ * The master test case.
+ */
+
+namespace QueryPath\Tests;
+
+//require_once 'PHPUnit/Autoload.php';
+//require_once __DIR__ . '/../../../src/qp.php';
+require __DIR__ . '/../../../vendor/autoload.php';
+
+class TestCase extends \PHPUnit_Framework_TestCase {
+  const DATA_FILE =  'test/data.xml';
+  public static function setUpBeforeClass(){
+  }
+
+  public function testFoo() {
+    // Placeholder. Why is PHPUnit emitting warnings about no tests?
+  }
+}

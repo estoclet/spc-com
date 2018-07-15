@@ -1,0 +1,87 @@
+name = Jollyness
+description = "Jollyness - Responsive Multi-Purpose Drupal Theme"
+core = 7.x
+base theme = drupalexp
+
+
+regions[social_top] = Social Top
+regions[contact_info] = Contact Info
+regions[cart] = Cart
+regions[search] = Search
+regions[slider] = Slider
+regions[logo] = Logo
+regions[navigation] = Navigation
+regions[breadcrumb] = Breadcrumb
+regions[pagetitle] = Page Title
+regions[google_maps] = maps
+regions[content] = Content
+regions[right_sidebar] = Right sidebar
+regions[left_sidebar] = Left sidebar
+
+regions[feature] = Feature
+regions[feature_first] = Feature First
+regions[feature_second] = Feature Second
+regions[feature_third] = Feature Third
+regions[feature_four] = Feature Four
+
+regions[our_works] = Our Works
+regions[services] = Services
+
+regions[parallax_1] = Parallax-1
+regions[parallax_2] = Parallax-2
+regions[parallax_3] = Parallax-3
+regions[parallax_4] = Parallax-4
+
+regions[client_feedback] = Client Feedback
+regions[latest_news] = Latest News
+regions[client] = Our Client
+regions[team] = Team
+
+regions[user_ext_01] = User extension 01
+regions[user_ext_02] = User extension 02
+
+regions[footer_first] = Footer First
+regions[footer_second] = Footer Second
+regions[footer_third] = Footer Third
+regions[footer_fourth] = Footer Fourth
+
+regions[user1] = User 1
+regions[user2] = User 2
+regions[user3] = User 3
+regions[user4] = User 4
+regions[user5] = User 5
+regions[user6] = User 6
+regions[user7] = User 7
+regions[user8] = User 8
+regions[user9] = User 9
+regions[user10] = User 10
+
+regions[copyright] = Copyright
+regions[footer_menu] = Footer Menu
+
+lessc[] = lessc/mixin.less
+lessc[] = lessc/general.less
+lessc[] = lessc/style.less
+lessc[] = lessc/block.less
+lessc[] = lessc/blog.less
+lessc[] = lessc/shortcode.less
+lessc[] = lessc/mainmenu.less
+lessc[] = lessc/portfolio.less
+lessc[] = lessc/simister.less
+lessc[] = lessc/slideshow.less
+lessc[] = lessc/pages.less
+lessc[] = lessc/shop.less
+lessc[] = lessc/config.less
+lessc[] = lessc/megamenu.less
+lessc[] = lessc/color.less
+lessc[] = lessc/quicksettings.less
+lessc[] = lessc/style-rtl.less 
+
+scripts[] = assets/js/jollyness.js 
+
+
+settings[drupalexp_default_preset] = '6'
+settings[toggle_main_menu] = '0'
+settings[drupalexp_layout] = 'wide'
+settings[logo_path] = 'logo.png'
+settings[toggle_main_menu] = '0'

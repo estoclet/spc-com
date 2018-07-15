@@ -1,0 +1,198 @@
+<?php
+
+/**
+ * @file
+ * Provides the UI for viewing budgets.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function erpal_budget_ui_menu() {
+  $budget_paths = array(
+    'budget_add' => 'admin/erpal/add-content/budget/add',
+    'budget_add_user' => 'budget/add',
+  );
+  foreach ($budget_paths as $key => $path) {
+    $items[$path] = array(
+      'title' => 'Add an budget',
+      'page callback' => 'erpal_budget_ui_add_budget',
+      'access callback' => 'entity_access',
+      'access arguments' => array('create_view', 'erpal_budget'),
+      'type' => MENU_NORMAL_ITEM,
+      'file' => 'erpal_budget_ui.pages.inc',
+      'weight' => 1,
+    );
+    $arg = 5;
+    if ($key == 'budget_add_user') {
+      $arg = 2;
+    }
+    foreach (erpal_budget_types() as $type => $info) {
+      $items[$path . '/' . $type] = array(
+        'title' => 'Add budget @type',
+        'title arguments' => array('@type' => $info->label),
+        'description' => $info->description,
+        'page callback' => 'erpal_budget_entity_ui_get_form_wrapper',
+        'page arguments' => array($arg),
+        'access callback' => 'entity_access',
+        'access arguments' => array('create', 'erpal_budget', $type),
+        'type' => MENU_NORMAL_ITEM,
+        'file' => 'erpal_budget_ui.pages.inc',
+      );
+    }
+  }
+
+  $items['erpal/budget/%erpal_budget/view'] = array(
+    'title' => 'View',
+    'weight' => -10,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+  );
+
+  $items['erpal/budget/%erpal_budget/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'entity_ui_get_form',
+    'page arguments' => array('erpal_budget', 2, 'edit'),
+    'access callback' => 'entity_access',
+    'access arguments' => array('edit', 'erpal_budget', 2),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'erpal_budget_ui.pages.inc',
+  );
+  $items['erpal/budget/%erpal_budget/delete'] = array(
+    'title' => 'Delete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('erpal_budget_form_delete_confirm', 2),
+    'access callback' => 'entity_access',
+    'access arguments' => array('edit', 'erpal_budget', 2),
+    'weight' => 1,
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'erpal_budget_ui.pages.inc',
+  );
+  $items['admin/erpal/budget-types/list'] = array(
+    'title' => 'List',
+    'weight' => -10,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_ctools_plugin_api().
+ *
+ * We provide our default pages for page_manager.
+ */
+function erpal_budget_ui_ctools_plugin_api($module = NULL, $api = NULL) {
+  if ($module == "page_manager" && $api == "pages_default") {
+    return array("version" => "1");
+  }
+  if ($module == "ds" && $api == "ds") {
+    return array("version" => "1");
+  }
+  if ($module == "panels_mini" && $api == "panels_default") {
+    return array("version" => "1");
+  }
+}
+
+
+/**
+ * Implements hook_admin_menu_map().
+ */
+function erpal_budget_ui_admin_menu_map() {
+  $map = $arguments = array();
+  $erpal_budget_types = array_keys(erpal_budget_types());
+  foreach ($erpal_budget_types as $type) {
+    $arguments[] = array(
+      '%erpal_budget_type' => array($type),
+      '%entity_object' => array($type),
+    );
+  }
+
+  if ($arguments) {
+    $map['admin/erpal/budget-types/manage/%erpal_budget_type'] = array(
+      // Link generated items directly to the "budget Types" item.
+      'parent' => 'admin/erpal/budget-types',
+      // Hide the "List" item, as this expansion will expose all available
+      // options.
+      'hide' => 'admin/erpal/budget-types/list',
+      // Create expansion arguments for the '%erpal_budget_type' placeholder.
+      'arguments' => $arguments,
+    );
+  }
+
+  return $map;
+}
+
+/**
+ * Implements hook_menu_local_tasks_alter().
+ */
+function erpal_budget_ui_menu_local_tasks_alter(&$data, $router_item, $root_path) {
+
+  $local_tasks = array();
+
+  if ($root_path == 'erpal/resource/%') {
+    $local_tasks[] = array(
+      'root_path' => $root_path,
+      'menu_item' => 'budget/add',
+      'title'     => 'Create budget',
+      'query'     => array('field_resource' => arg(2)),
+    );
+  }
+
+  erpal_core_add_local_actions($data, $local_tasks, $root_path);
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function erpal_budget_ui_form_alter(&$form, &$form_state, $form_id) {
+  // Alter the operations links so they looks like CTools dropbutton.
+  if ($form_id == 'erpal_budget_type_overview_form') {
+    $ops_count = $form['table']['#header'][2]['colspan'];
+    $form['table']['#header'][2] = t('Operations');
+
+    erpal_core_ui_ctools_add_dropbutton_files();
+    foreach ($form['table']['#rows'] as $key => $row) {
+      $budget = theme('erpal_core_ui_ctools_dropbutton', array(
+        'ops_count' => $ops_count,
+        'links' => $row,
+        'index' => $key,
+      ));
+
+      $form['table']['#rows'][$key] = array_merge(array_slice($row, 0, count($row) - $ops_count), array($budget));
+    }
+  }
+
+  // Alter label column to change unit machime name.
+  if ($form_id == 'units_unit_overview_form') {
+    foreach ($form['table']['#rows'] as $key => $row) {
+      $unit = units_unit_load($form['table']['#rows'][$key][0]['data']['#name']);
+      $form['table']['#rows'][$key][0]['data']['#name'] = $unit->machine_name;
+    }
+  }
+
+  // Alter budget_edit_form.
+  if (strpos($form_id, 'erpal_budget_edit_') === 0) {
+    $form['field_budget_total']['#disabled'] = $form_state['erpal_budget']->isLocked();
+    $form['field_budget_available']['#disabled'] = $form_state['erpal_budget']->isLocked();
+    $form['field_budget_negative']['#disabled'] = $form_state['erpal_budget']->isLocked();
+    $form['actions']['delete']['#disabled'] = $form_state['erpal_budget']->isLocked();
+  }
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function erpal_budget_ui_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'erpal_budget_ui') . '/views',
+  );
+}
+
+
+/**
+ * Budget UI view callback.
+ */
+function erpal_budget_ui_view($budget) {
+  return erpal_budget_view($budget);
+}

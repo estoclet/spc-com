@@ -1,0 +1,226 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall functions for the ERPAL budget module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function erpal_budget_install() {
+  $t = get_t();
+
+  module_load_include('inc', 'erpal_budget', 'includes/erpal_budget.units');
+  _erpal_budget_units_import();
+
+  $units_info = units_measure_load_multiple(FALSE);
+  foreach ($units_info as $measure) {
+    // Create a default budget type.
+    $budget = entity_create('erpal_budget_type', array(
+      'type' => $measure->measure,
+      'label' => $measure->label,
+      'description' => $t('Default !name budget.', array('!name' => $measure->label)),
+    ));
+    variable_set('budget_' . $measure->measure, $measure->measure);
+    erpal_budget_type_save($budget);
+  }
+}
+
+/**
+ * Implements hook_enable().
+ */
+function erpal_budget_enable() {
+  // Clear the cache to display in Feeds as available plugin.
+  cache_clear_all('plugins:feeds:plugins', 'cache');
+  // Clear menu cache to displat entity links.
+  cache_clear_all(NULL, 'cache_menu');
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function erpal_budget_uninstall() {
+  $additional_params = array('include_inactive' => TRUE);
+  $instances = field_read_instances(array('entity_type' => 'erpal_budget'), $additional_params);
+  foreach ($instances as $instance) {
+    field_delete_instance($instance);
+  }
+
+  // Remove variables.
+  module_load_include('inc', 'erpal_budget', 'includes/erpal_budget.units');
+  $units_info = _erpal_budget_units_default();
+  foreach ($units_info as $measure => $measure_info) {
+    variable_del('budget_' . $measure);
+  }
+}
+
+/**
+ * Implements hook_schema().
+ */
+function erpal_budget_schema() {
+  $schema = array();
+
+  $schema['erpal_budget'] = array(
+    'description' => 'The base table for budgets.',
+    'fields' => array(
+      'budget_id' => array(
+        'description' => 'The primary identifier for an budget.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'revision_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => NULL,
+        'description' => 'Primary identifier of this {erpal_budget_revision}.',
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that owns this budget; initially, this is the user that created it.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'type' => array(
+        'description' => 'The type (bundle) of this budget.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'title' => array(
+        'description' => 'The title of the budget.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the budget was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the budget was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'indexes' => array(
+      'created' => array('created'),
+      'changed' => array('changed'),
+    ),
+    'foreign keys' => array(
+      'budget_type' => array(
+        'table' => 'erpal_budget_type',
+        'columns' => array('type' => 'type'),
+      ),
+      'budget_revision' => array(
+        'table' => 'erpal_budget_revision',
+        'columns' => array('revision_id' => 'revision_id'),
+      ),
+    ),
+    'primary key' => array('budget_id'),
+  );
+
+  $schema['erpal_budget_revision'] = array(
+    'description' => 'Stores information about each saved revision of a {erpal_budget}',
+    'fields' => array(
+      'revision_id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary identifier of this {erpal_budget_revision}.',
+      ),
+      'budget_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => NULL,
+        'description' => 'The {erpal_budget}.budget_id for this revision.',
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that created this version.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'description' => 'The title of the budget.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the budget was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the budget was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'foreign keys' => array(
+      'versioned_budget' => array(
+        'table' => 'erpal_budget',
+        'columns' => array('budget_id' => 'budget_id'),
+      ),
+      'version_creator' => array(
+        'table' => 'user',
+        'columns' => array('uid' => 'uid'),
+      ),
+    ),
+    'primary key' => array('revision_id'),
+  );
+
+  $schema['erpal_budget_type'] = array(
+    'description' => 'Stores information about all defined budget types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique budget type ID.',
+      ),
+      'type' => array(
+        'description' => 'The machine-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'description' => array(
+        'description' => 'A brief description of this type.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium',
+        'translatable' => TRUE,
+      ),
+    ) + entity_exportable_schema_fields(),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'type' => array('type'),
+    ),
+  );
+
+  if (module_exists('uuid')) {
+    $field = uuid_schema_field_definition();
+    $schema['erpal_budget']['fields']['uuid'] = $field;
+    $schema['erpal_budget']['indexes']['uuid'] = array('uuid');
+    $schema['erpal_budget_revision']['fields']['vuuid'] = $field;
+    $schema['erpal_budget_revision']['indexes']['vuuid'] = array('vuuid');
+  }
+
+  return $schema;
+}

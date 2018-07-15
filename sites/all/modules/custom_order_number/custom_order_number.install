@@ -1,0 +1,54 @@
+<?php
+
+/**
+ * @file
+ * Custom order number installation file.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function custom_order_number_uninstall() {
+  variable_del('custom_order_number_commerce_order_nr_method');
+  variable_del('custom_order_number_commerce_order_nr_pattern');
+  variable_del('custom_order_number_commerce_order_nr_last');
+  variable_del('custom_order_number_commerce_order_nr_enable');
+  if (function_exists('commerce_order_types_order_types')) {
+    foreach (commerce_order_types_order_types() as $type => $info) {
+      if ($type == 'commerce_order') {
+        continue;
+      }
+      variable_del('custom_order_number_' . $type . '_nr_method');
+      variable_del('custom_order_number_' . $type . '_nr_pattern');
+      variable_del('custom_order_number_' . $type . '_nr_last');
+      variable_del('custom_order_number_' . $type . '_nr_enable');
+    }
+  }
+}
+
+/**
+ * Implements hook_install().
+ */
+function custom_order_number_install() {
+
+  $new_nr_array = array(
+    'year' => date('Y'),
+    'id' => 0,
+  );
+  variable_set('custom_order_number_commerce_order_nr_last', $new_nr_array);
+  variable_set('custom_order_number_commerce_order_nr_pattern', '[date:custom:Y]-{id}');
+  variable_set('custom_order_number_commerce_order_nr_method', CUSTOM_ORDER_NUMBER_METHOD_YEARLY);
+  variable_set('custom_order_number_commerce_order_nr_enable', TRUE);
+  
+   if (function_exists('commerce_order_types_order_types')) {
+    foreach (commerce_order_types_order_types() as $type => $info) {
+      if ($type == 'commerce_order') {
+        continue;
+      }
+      variable_set('custom_order_number_' . $type . '_nr_last', $new_nr_array);
+      variable_set('custom_order_number_' . $type . '_nr_pattern', '[date:custom:Y]-{id}');
+      variable_set('custom_order_number_' . $type . '_nr_method', CUSTOM_ORDER_NUMBER_METHOD_YEARLY);
+      variable_set('custom_order_number_' . $type . '_nr_enable', TRUE);
+    }
+  }
+}

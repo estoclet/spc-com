@@ -1,0 +1,15 @@
+name = Maintenance Countdown
+description = "This module provides the maintenance page with nice countdown timer. So now you may set time for your maintenance work and your visitors will see when it's will over."
+core = 7.x
+package = Maintenance
+
+files[] = mcd.module
+files[] = mcd.countdown.inc
+
+configure = admin/config/development/maintenance
+; Information added by drupal.org packaging script on 2012-11-10
+version = "7.x-1.4"
+core = "7.x"
+project = "mcd"
+datestamp = "1352582514"
+
